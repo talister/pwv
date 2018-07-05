@@ -24,3 +24,17 @@ def fetch_pwv(site, year=datetime.utcnow().year):
     for column in table.columns:
         table[column].unit = units[column]
     return table
+
+def map_LCO_to_GPS_sites(site_code):
+    """Maps LCO site codes (e.g. 'LSC') to SuomiNet sites (e.g. 'CTIO'). None
+    is returned if the LCO site code was not found or there isn't a
+    corresponding GPS site"""
+    
+    mapping = { 'LSC' : 'CTIO', 
+                'CPT' : 'SUTM', 
+                'TFN' : None, 
+                'COJ' : None, 
+                'ELP' : 'MDO1', 
+                'OGG' : 'MAUI' }
+
+    return mapping.get(site_code.upper(), None)
