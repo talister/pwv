@@ -1,9 +1,18 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from urllib.parse import urljoin
 from astropy.table import QTable
 import astropy.units as u
 
+def convert_decimal_day(decimal_day):
+
+    dt = datetime(datetime.utcnow().year-1, 12, 31) + timedelta(decimal_day)
+    if dt.microsecond >= 500000:
+        dt += timedelta(seconds=1)
+        dt = dt.replace(microsecond = 0)
+    else:
+        dt= dt.replace(microsecond = 0)
+    return dt
 
 def fetch_pwv(site, year=datetime.utcnow().year):
 
