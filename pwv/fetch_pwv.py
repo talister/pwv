@@ -1,7 +1,11 @@
 from datetime import datetime, timedelta
 import os
 
-from urllib.parse import urljoin
+try:
+    from urllib.parse import urljoin
+except ImportError:
+    from urlparse import urljoin
+
 from astropy.table import QTable, Column
 import astropy.units as u
 import numpy as np
