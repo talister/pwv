@@ -77,3 +77,33 @@ class TestComputePWV(object):
         pwv = compute_pwv(ztd, self.CTIO, pressure, temp)
 
         assert_quantity_allclose(expected_pwv, pwv, rtol=1e-3)
+
+class TestDetermineTimeIndex(object):
+
+    def test_t1(self):
+        expected_value = 184105
+
+        t_value = determine_time_index('00:30Z01JAN2001')
+
+        assert expected_value == t_value
+
+    def test_t2(self):
+        expected_value = 192864
+
+        t_value = determine_time_index('23:30Z31DEC2001')
+
+        assert expected_value == t_value
+
+    def test_t1_dt(self):
+        expected_value = 184105
+
+        t_value = determine_time_index(datetime(2001,1,1,0,30,0))
+
+        assert expected_value == t_value
+
+    def test_t2_dt(self):
+        expected_value = 192864
+
+        t_value = determine_time_index(datetime(2001,12,31,23,30))
+
+        assert expected_value == t_value

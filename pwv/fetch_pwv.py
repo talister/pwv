@@ -59,11 +59,11 @@ def map_LCO_to_GPS_sites(site_code):
     is returned if the LCO site code was not found or there isn't a
     corresponding GPS site"""
 
-    mapping = { 'LSC' : 'CTIO', 
-                'CPT' : 'SUTM', 
-                'TFN' : None, 
-                'COJ' : None, 
-                'ELP' : 'MDO1', 
+    mapping = { 'LSC' : 'CTIO',
+                'CPT' : 'SUTM',
+                'TFN' : None,
+                'COJ' : None,
+                'ELP' : 'MDO1',
                 'OGG' : 'MAUI' }
 
     return mapping.get(site_code.upper(), None)
@@ -90,6 +90,39 @@ def read_merra2(hdf_path, datafile, columns=['PS', 'T2M', 'QV2M', 'TO3', 'TQV'])
 
     return table
 
+def read_ascii(filepath):
+    """Read single parameter ASCII format files extracted from the GrADS server e.g.
+     https://goldsmr4.gesdisc.eosdis.nasa.gov/dods/M2T1NXSLV.ascii?tqv"""
+
+    foo_fh = open(filepath, 'r')
+
+    in_data = False
+    data = {}
+    for line in foo_fh:
+        line = line.rstrip()
+        if len(line) == 0:
+            continue
+        if line.count(',') == 1:
+            if line[0] != '[':
+                if in_data is True:
+                    data[array_name] = array
+                    array = []
+                    array_name = line.split(',')[0]
+                else:
+                    in_data = True
+                    array = []
+                    array_name = line.split(',')[0]
+            else:
+                value = float(line.split(',')[1].strip())
+                array.append(value)
+        elif line.count(',') >= 1 and in_data is True:
+            values = [float(x.strip()) for x in line.split(',')]
+            data[array_name] = values
+            in_data = False
+    foo_fh.close()
+
+    return data
+
 def determine_cell(location, lats, longs):
     """Determines the latitude and longitude array indices corresponding to
     the latitude and longitude of the passed <location> (this should either
@@ -115,7 +148,13 @@ def determine_cell(location, lats, longs):
         long_idx = (np.abs(longs-site_long)).argmin()
         lat_idx  = (np.abs(lats-site_lat)).argmin()
 
-    return long_idx, lat_idx
+    return lat_idx, long_idx
+
+def determine_index(location, lon0=-180, lat0=-90, lonres=0.625, latres=0.5):
+    long_idx = int((location.lon.degree - lon0)/lonres) + 1
+    lat_idx  = int((location.lat.degree - lat0)/latres) + 1
+
+    return lat_idx, long_idx
 
 def extract_timeseries(data, long_idx, lat_idx):
     """Subset the passed MERRA-2 dataset in <data> for the

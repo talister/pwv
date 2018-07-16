@@ -1,5 +1,7 @@
-import astropy.units as u
 from math import cos
+from datetime import datetime, timedelta
+
+import astropy.units as u
 
 def compute_zhd(pres, location):
     """Compute Zenith Hydrostatic Delay (ZHD) from total pressure at the
@@ -53,3 +55,17 @@ def compute_pwv(ztd, location, pres, T_2m):
     pwv = kappa * zwd.to(u.mm)
 
     return pwv
+
+def determine_time_index(date_or_str, t0='00:30Z01Jan1980'):
+
+    if type(t0) != datetime:
+        t0 = datetime.strptime(t0, '%H:%MZ%d%b%Y')
+
+    if type(date_or_str) != datetime:
+        t = datetime.strptime(date_or_str, '%H:%MZ%d%b%Y')
+    else:
+        t = date_or_str
+    delta_t = t-t0
+    index = int(delta_t.total_seconds()/3600) + 1
+
+    return index
