@@ -1,3 +1,6 @@
 astropy
 netCDF4
 matplotlib
+pytest
+modapsclient
+python-hdf4

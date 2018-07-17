@@ -5,6 +5,8 @@ try:
     from urllib.parse import urljoin
 except ImportError:
     from urlparse import urljoin
+import urllib.request
+from subprocess import check_output
 
 from astropy.table import QTable, Column
 import astropy.units as u
@@ -145,8 +147,18 @@ def determine_cell(location, lats, longs):
         site_lat = location.get('lat', None)
 
     if site_long is not None and site_lat is not None:
-        long_idx = (np.abs(longs-site_long)).argmin()
-        lat_idx  = (np.abs(lats-site_lat)).argmin()
+        if lats.ndim == 1 and longs.ndim == 1:
+            # 1d arrays
+            long_idx = (np.abs(longs-site_long)).argmin()
+            lat_idx  = (np.abs(lats-site_lat)).argmin()
+        elif lats.ndim == 2 and longs.ndim == 2:
+            # 2d arrays
+            X = np.abs(longs-site_long)
+            long_idx = np.where(X == X.min())
+            Y = np.abs(lats-site_lat)
+            lat_idx = np.where(Y == Y.min())
+        else:
+            print("Unknown number of dimensions: %d x %d" % (lats.ndim, longs.ndim))
 
     return lat_idx, long_idx
 
@@ -161,6 +173,122 @@ def extract_timeseries(data, long_idx, lat_idx):
     data[t,lats,longs]"""
 
     return data[:,lat_idx,long_idx]
+
+def find_modis_data(location, date=datetime.utcnow(), products=['MODATML2','MYDATML2'], collection='61', dbg=False):
+    import modapsclient as m
+    a = m.ModapsClient()
+
+    start_date = date.date()
+    end_date = start_date+timedelta(days=1)
+    lat = location.lat.deg
+    lon = location.lon.deg
+    delta = 0.1
+    north_val = max(lat+delta, lat-delta)
+    west_val  = min(lon+delta, lon-delta)
+    east_val  = max(lon+delta, lon-delta)
+    south_val = min(lat+delta, lat-delta)
+    dl_files = {}
+    for product in products:
+        if dbg: print(product)
+        collections = a.getCollections(product)
+        if collection not in collections:
+            print("Did not find specified collection (%s) in %s".format(collection, collections))
+            return None
+        files = a.searchForFiles(product, start_date, end_date, north=north_val, west=west_val, east=east_val, south=south_val, collection=collection)
+        if dbg: print(files)
+        for hdf_file in files:
+            url = a.getFileUrls(hdf_file)
+            props = a.getFileProperties(hdf_file)
+            if len(props) == 1:
+                props = props[0]
+            else:
+                print("Unexpected number of file properties found")
+                continue
+            if props.get('online', 'false') == 'true':
+               dl_files[hdf_file] = { 'url' : url,
+                                      'checksum' : props.get('checksum', ''),
+                                      'size' : props.get('fileSizeBytes', ''),
+                                      'name' : props.get('fileName', '')
+                                    }
+            else:
+                print("File id %d (%s) is not online".format(hdf_file, props.get('fileName', 'UNKNOWN')))
+    return dl_files
+
+def download_files(files, outpath):
+    try:
+        os.makedirs(outpath)
+    except FileExistsError:
+        pass
+
+    num_dl = 0
+    for file_id in files:
+        url = files[file_id]['url'][0]
+        dl_file = files[file_id]['name']
+        file_name = os.path.join(outpath, os.path.basename(dl_file))
+        if os.path.exists(file_name) is False:
+            urllib.request.urlretrieve(url, file_name)
+            num_dl += 1
+            output = check_output(['cksum', file_name])
+            chunks = output.decode('ascii', 'ignore').split()
+            if chunks[0] == files[file_id]['checksum'] and chunks[1] == files[file_id]['size']:
+                print("Downloaded {}".format(dl_file))
+            else:
+                print("Checksum/file size check failed for {}".format(dl_file))
+        else:
+            print("{} already downloaded".format(dl_file))
+    return num_dl
+
+def dataset_mapping(product):
+    mappings = { 'MODATML2' : { 'PWV' : 'Precipitable_Water_Infrared_ClearSky',},
+                 'MYD05_L2' : { 'PWV' : 'Water_Vapor_Infrared', },
+                 'MOD05_L2' : { 'PWV' : 'Water_Vapor_Infrared', },
+               }
+    return mappings.get(product, {})
+
+def read_modis_pwv(datafile, DATAFIELD_NAME = 'Water_Vapor_Infrared'):
+    from pyhdf.SD import SD, SDC
+
+    hdf = SD(datafile, SDC.READ)
+
+    # Read dataset.
+    data2D = hdf.select(DATAFIELD_NAME)
+    data = data2D[:,:].astype(np.double)
+
+    hdf_geo = SD(datafile, SDC.READ)
+
+    # Read geolocation dataset from MOD03 product.
+    lat = hdf_geo.select('Latitude')
+    latitude = lat[:,:]
+    lon = hdf_geo.select('Longitude')
+    longitude = lon[:,:]
+
+    # Retrieve attributes.
+    attrs = data2D.attributes(full=1)
+    lna=attrs["long_name"]
+    long_name = lna[0]
+    aoa=attrs["add_offset"]
+    add_offset = aoa[0]
+    fva=attrs["_FillValue"]
+    _FillValue = fva[0]
+    sfa=attrs["scale_factor"]
+    scale_factor = sfa[0]
+    vra=attrs["valid_range"]
+    valid_min = vra[0][0]
+    valid_max = vra[0][1]
+    try:
+        ua=attrs["unit"]
+    except KeyError:
+        ua=attrs["units"]
+    units = ua[0]
+
+    invalid = np.logical_or(data > valid_max,
+                            data < valid_min)
+    invalid = np.logical_or(invalid, data == _FillValue)
+    data[invalid] = np.nan
+    data = (data - add_offset) * scale_factor
+    data = np.ma.masked_array(data, np.isnan(data))
+
+    return data, latitude, longitude
 
 def plot_merra2_pwv(hdf_path, datafile):
     import matplotlib.cm as cm
