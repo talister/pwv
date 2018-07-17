@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import os
+from glob import glob
 
 try:
     from urllib.parse import urljoin
@@ -175,14 +176,14 @@ def extract_timeseries(data, long_idx, lat_idx):
 
     return data[:,lat_idx,long_idx]
 
-def find_modis_data(location, date=datetime.utcnow(), products=['MODATML2','MYDATML2'], collection='61', dbg=False):
+def find_modis_data(location, date=datetime.utcnow(), ndays=1, products=['MODATML2','MYDATML2'], collection='61', dbg=False):
     import modapsclient as m
     import logging
     logging.basicConfig(level=logging.WARNING)
     a = m.ModapsClient()
 
     start_date = date.date()
-    end_date = start_date+timedelta(days=1)
+    end_date = start_date+timedelta(days=ndays)
     lat = location.lat.deg
     lon = location.lon.deg
     delta = 0.1
@@ -318,6 +319,37 @@ def read_modis_pwv(datafile, DATAFIELD_NAME = 'Water_Vapor_Infrared'):
     data = np.ma.masked_array(data, np.isnan(data))
 
     return data, latitude, longitude, units, long_name
+
+def split_MODIS_filename(filename):
+    """Extracts the product, datetime and collection from a MODIS filename"""
+
+    filename = os.path.basename(filename)
+    chunks = filename.split('.')
+    dt = datetime.strptime(chunks[1]+chunks[2], 'A%Y%j%H%M')
+    return chunks[0], dt, str(int(chunks[3]))
+
+def extract_MODIS_pwv_timeseries(hdf_path, location):
+
+    pwv_values = []
+    times = []
+    for hdf_file in glob(os.path.join(hdf_path, '*.hdf')):
+        product, date, collection = split_MODIS_filename(hdf_file)
+        mapping = dataset_mapping(product)
+        if len(mapping) == 0:
+            print("Unable to find product mapping for {}".format(product))
+            continue
+        dataset_name = mapping.get('PWV', None)
+        if dataset_name is not None:
+            data, latitude, longitude, name, units = read_modis_pwv(hdf_file, dataset_name)
+            lat_idx, long_idx = determine_cell(location, latitude, longitude)
+            print(os.path.basename(hdf_file), lat_idx, long_idx, latitude.shape, longitude.shape, data.shape)
+            pwv_value = data[lat_idx, long_idx]
+            times.append(date)
+            pwv_values.append(pwv_value[0])
+            print(pwv_value[0])
+        else:
+            print("Unable to find dataset mapping for PWV in {}".format(mapping.keys()))
+    return times, pwv_values
 
 def plot_merra2_pwv(hdf_path, datafile):
     import matplotlib.cm as cm
