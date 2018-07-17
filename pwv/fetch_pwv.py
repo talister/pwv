@@ -16,6 +16,7 @@ import netCDF4 as nc
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.ticker import MaxNLocator, AutoMinorLocator
+from mpl_toolkits.basemap import Basemap
 
 def convert_decimal_day(decimal_day):
 
@@ -176,6 +177,8 @@ def extract_timeseries(data, long_idx, lat_idx):
 
 def find_modis_data(location, date=datetime.utcnow(), products=['MODATML2','MYDATML2'], collection='61', dbg=False):
     import modapsclient as m
+    import logging
+    logging.basicConfig(level=logging.WARNING)
     a = m.ModapsClient()
 
     start_date = date.date()
@@ -314,7 +317,7 @@ def read_modis_pwv(datafile, DATAFIELD_NAME = 'Water_Vapor_Infrared'):
     data = (data - add_offset) * scale_factor
     data = np.ma.masked_array(data, np.isnan(data))
 
-    return data, latitude, longitude
+    return data, latitude, longitude, units, long_name
 
 def plot_merra2_pwv(hdf_path, datafile):
     import matplotlib.cm as cm
@@ -383,3 +386,29 @@ def plot_pwv_timeseries(CTIO_table, times, CTIO_pwv, filename='CTIO_GPS_MERRA2_c
     plt.savefig(filename, format='png')
 
     return filename
+
+def plot_modis(basename, location, data, latitude, longitude, units, long_name):
+
+    delta = 15.0
+    lat = location.lat.deg
+    lon = location.lon.deg
+    north_val = max(lat+delta, lat-delta)
+    west_val  = min(lon+delta, lon-delta)
+    east_val  = max(lon+delta, lon-delta)
+    south_val = min(lat+delta, lat-delta)
+    plt.clf()
+    m = Basemap(projection='stere', resolution='l',
+                    llcrnrlon=west_val,llcrnrlat=south_val,urcrnrlon=east_val,urcrnrlat=north_val,lat_0=lat,lon_0=lon)
+    m.drawcoastlines(linewidth=0.5)
+    m.drawparallels(np.arange(-90., 90., 10.), labels=[1, 0, 0, 0])
+    m.drawmeridians(np.arange(-180, 180., 15), labels=[0, 0, 0, 1])
+    m.pcolormesh(longitude, latitude, data, latlon=True)
+
+    cb = m.colorbar()
+    cb.set_label(units)
+    basename = os.path.basename(basename)
+    plt.title('{0}\n{1}\n'.format(basename, long_name))
+    fig = plt.gcf()
+    pngfile = "{0}.py.png".format(basename)
+    fig.savefig(pngfile)
+    return pngfile
