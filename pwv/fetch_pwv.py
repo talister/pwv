@@ -239,7 +239,17 @@ def download_files(files, outpath):
     return num_dl
 
 def dataset_mapping(product):
-    mappings = { 'MODATML2' : { 'PWV' : 'Precipitable_Water_Infrared_ClearSky',},
+    """Define mappings for particular MODIS products <product> to dataset names.
+    If a single dataset name is given, this uses the standard latitude, longitude
+    grid; otherwise a tuple of the latitude, longitude grid names to use is given"""
+
+    joint_atm = { 'PWV' : 'Precipitable_Water_Infrared_ClearSky',
+                  'O3'  : 'Total_Ozone',
+                  'AOD' : ('AOD_550_Dark_Target_Deep_Blue_Combined', ('Longitude_10km', 'Latitude_10km')),
+                  'AAE' : ('Aerosol_Angstrom_Exponent_Ocean', ('Longitude_10km', 'Latitude_10km')),
+                }
+    mappings = { 'MODATML2' : joint_atm,
+                 'MYDATML2' : joint_atm,
                  'MYD05_L2' : { 'PWV' : 'Water_Vapor_Infrared', },
                  'MOD05_L2' : { 'PWV' : 'Water_Vapor_Infrared', },
                }
@@ -254,32 +264,48 @@ def read_modis_pwv(datafile, DATAFIELD_NAME = 'Water_Vapor_Infrared'):
     data2D = hdf.select(DATAFIELD_NAME)
     data = data2D[:,:].astype(np.double)
 
-    hdf_geo = SD(datafile, SDC.READ)
-
-    # Read geolocation dataset from MOD03 product.
-    lat = hdf_geo.select('Latitude')
+    # Read geolocation dataset.
+    lat = hdf.select('Latitude')
     latitude = lat[:,:]
-    lon = hdf_geo.select('Longitude')
+    lon = hdf.select('Longitude')
     longitude = lon[:,:]
 
-    # Retrieve attributes.
+    # Retrieve attributes for dataset
     attrs = data2D.attributes(full=1)
-    lna=attrs["long_name"]
+    lna = attrs["long_name"]
     long_name = lna[0]
-    aoa=attrs["add_offset"]
+    aoa = attrs["add_offset"]
     add_offset = aoa[0]
-    fva=attrs["_FillValue"]
+    fva = attrs["_FillValue"]
     _FillValue = fva[0]
-    sfa=attrs["scale_factor"]
+    sfa = attrs["scale_factor"]
     scale_factor = sfa[0]
-    vra=attrs["valid_range"]
+    vra = attrs["valid_range"]
     valid_min = vra[0][0]
     valid_max = vra[0][1]
     try:
-        ua=attrs["unit"]
+        ua = attrs["unit"]
     except KeyError:
-        ua=attrs["units"]
+        ua = attrs["units"]
     units = ua[0]
+
+    # Retrieve attributes for lat/lon, correct for scale factor and offset
+    # if needed
+    attrs = lat.attributes(full=1)
+    aoa = attrs.get("add_offset", [0.0])
+    lat_add_offset = aoa[0]
+    sfa = attrs.get("scale_factor", [1.0])
+    lat_scale_factor = sfa[0]
+
+    attrs = lon.attributes(full=1)
+    aoa = attrs.get("add_offset", [0.0])
+    lon_add_offset = aoa[0]
+    sfa = attrs.get("scale_factor", [1.0])
+    lon_scale_factor = sfa[0]
+
+    # NetCDF does the following automatically but PyHDF doesn't
+    latitude = (latitude - lat_add_offset) * lat_scale_factor
+    longitude = (longitude - lon_add_offset) * lon_scale_factor
 
     invalid = np.logical_or(data > valid_max,
                             data < valid_min)
