@@ -30,9 +30,9 @@ def calc_great_circle_distance(latitudes,longitudes,location):
                             from location
     """
 
-    dlong = np.radians(longitudes) - location.lon.rad
+    dlong = np.abs(np.radians(longitudes) - location.lon.rad)
 
-    dsigma = np.arccos( np.sin(np.radians(latitudes))*np.sin(location.lat.rad) + \
-                        np.cos(np.radians(latitudes))*np.cos(np.radians(latitudes))*np.cos(dlong))
-
+    dsigma_pre = np.sin(np.radians(latitudes))*np.sin(location.lat.rad) + \
+                        (np.cos(np.radians(longitudes))*np.cos(location.lon.rad)*np.cos(dlong))
+    dsigma = np.arccos(dsigma_pre)
     return dsigma

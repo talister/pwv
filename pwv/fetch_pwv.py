@@ -17,7 +17,6 @@ import netCDF4 as nc
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.ticker import MaxNLocator, AutoMinorLocator
-from mpl_toolkits.basemap import Basemap
 
 def convert_decimal_day(decimal_day):
 
@@ -343,7 +342,7 @@ def extract_MODIS_pwv_timeseries(hdf_path, location):
             data, latitude, longitude, name, units = read_modis_pwv(hdf_file, dataset_name)
             lat_idx, long_idx = determine_cell(location, latitude, longitude)
             print(os.path.basename(hdf_file), lat_idx, long_idx, latitude.shape, longitude.shape, data.shape)
-            pwv_value = data[lat_idx, long_idx]
+            pwv_value = data[lat_idx[0], long_idx[1]]
             times.append(date)
             pwv_values.append(pwv_value[0])
             print(pwv_value[0])
@@ -420,6 +419,8 @@ def plot_pwv_timeseries(CTIO_table, times, CTIO_pwv, filename='CTIO_GPS_MERRA2_c
     return filename
 
 def plot_modis(basename, location, data, latitude, longitude, units, long_name):
+
+    from mpl_toolkits.basemap import Basemap
 
     delta = 15.0
     lat = location.lat.deg
