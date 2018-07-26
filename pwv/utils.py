@@ -1,5 +1,7 @@
 from math import cos
 from datetime import datetime, timedelta
+import time
+import warnings
 
 import astropy.units as u
 PascalPerMillibar = 100.0
@@ -71,6 +73,21 @@ def determine_time_index(date_or_str, t0='00:30Z01Jan1980'):
 
     return index
 
+def toYearFraction(date):
+    def sinceEpoch(date): # returns seconds since epoch
+        return time.mktime(date.timetuple())
+    s = sinceEpoch
+
+    year = date.year
+    startOfThisYear = datetime(year=year, month=1, day=1)
+    startOfNextYear = datetime(year=year+1, month=1, day=1)
+
+    yearElapsed = s(date) - s(startOfThisYear)
+    yearDuration = s(startOfNextYear) - s(startOfThisYear)
+    fraction = yearElapsed/yearDuration
+
+    return date.year + fraction
+
 def pascal_to_mbar(pascals):
     """Convert pressure from Pascals to millibars
     """
@@ -83,3 +100,25 @@ def mbar_to_pascal(mbar):
     """Convert pressure from millibars to Pascals
     """
     return mbar*PascalPerMillibar*u.Pa
+
+def co2_ppmv(date=datetime.utcnow()):
+    """Returns the CO2 concentration in ppmv (or micromol/mol) as a function
+    of the year. This is from a quadratic fit to the Mauna Loa dataset:
+    ftp://aftp.cmdl.noaa.gov/products/trends/co2/co2_annmean_mlo.txt
+    The fit uses 1976.0 as a pivot point as this is the year that the US
+    standard atmosphere models are based.
+    """
+
+    if type(date) == int:
+        date = datetime(date, 1, 1)
+    year = toYearFraction(date)
+    if year < 1950 or year > 2018:
+        warnings.warn("Warning, year is beyond the end of the fit (1950..2017)")
+    x = year-1976.0
+    a0 = 333.038137957249
+    a1 = 1.25213771117096
+    a2 = 0.0124809170121469
+
+    co2 = a0 + a1 * x + a2 * x**2
+
+    return co2
