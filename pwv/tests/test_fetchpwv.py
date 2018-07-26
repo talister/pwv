@@ -1,5 +1,8 @@
 from datetime import datetime
 
+from astropy.coordinates import EarthLocation
+import astropy.units as u
+
 from pwv.fetch_pwv import *
 
 class TestConvertDecimalDay(object):
@@ -49,3 +52,16 @@ class TestSplitMODISfilename(object):
         assert expected_product == product
         assert expected_dt == dt
         assert expected_collection == collection
+
+class TestDetermineGDSUrl(object):
+
+    def test_ges_tutorial_example(self):
+        expected_url = "https://goldsmr4.gesdisc.eosdis.nasa.gov/dods/M2T1NXSLV.ascii?u50m[184105:192864][273][124]"
+
+        loc = EarthLocation(lon=-103.125*u.deg, lat=46.05*u.deg)
+        start = datetime(2001, 1, 1, 0, 30, 0)
+        end = datetime(2001, 12, 31, 23, 30, 0)
+
+        url = determine_gds_url(loc, start, end, quantity='u50m')
+
+        assert expected_url == url

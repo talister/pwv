@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 import os
 from glob import glob
 
@@ -6,7 +6,15 @@ try:
     from urllib.parse import urljoin
 except ImportError:
     from urlparse import urljoin
-import urllib.request
+try:
+    import urllib2 as ur
+except ImportError:
+    import urllib.request as ur
+try:
+    from cookielib import CookieJar
+except ImportError:
+    from http.cookiejar import CookieJar
+from netrc import netrc
 from subprocess import check_output
 
 from astropy.table import QTable, Column
@@ -17,6 +25,7 @@ import netCDF4 as nc
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.ticker import MaxNLocator, AutoMinorLocator
+from pwv.utils import determine_time_index
 
 def convert_decimal_day(decimal_day):
 
@@ -93,36 +102,115 @@ def read_merra2(hdf_path, datafile, columns=['PS', 'T2M', 'QV2M', 'TO3', 'TQV'])
 
     return table
 
+def earthdata_login(username=None, password=None):
+    """Login into NASA Earthdata system with specified username and password.
+    Adapted from https://wiki.earthdata.nasa.gov/display/EL/How+To+Access+Data+With+Python
+    Returns urllib opener..."""
+
+    host = 'urs.earthdata.nasa.gov'
+    if username is None or password is None:
+        user_netrc = netrc()
+        auth = user_netrc.authenticators(host)
+        if auth is not None:
+            username = auth[0]
+            password = auth[2]
+        else:
+            print("Could not find authentication for '{}' in $HOME/.netrc")
+            return None
+
+    # Create a password manager to deal with the 401 reponse that is returned from
+    # Earthdata Login
+    password_manager = ur.HTTPPasswordMgrWithDefaultRealm()
+    password_manager.add_password(None, "https://{}".format(host), username, password)
+    cookie_jar = CookieJar()
+
+    opener = ur.build_opener(ur.HTTPBasicAuthHandler(password_manager),
+        #ur.HTTPHandler(debuglevel=1),    # Uncomment these two lines to see
+        #ur.HTTPSHandler(debuglevel=1),   # details of the requests/responses
+        ur.HTTPCookieProcessor(cookie_jar))
+
+    return opener
+
+def determine_gds_url(location, start=None, end=None, product='M2T1NXSLV', quantity='tqv'):
+    """Fetches a time series of a quantity from MERRA-2 products at a single point"""
+
+    GDS_URL = 'https://goldsmr4.gesdisc.eosdis.nasa.gov/dods'
+    start = start or datetime.utcnow()
+    end = end or start + timedelta(days=1)
+
+    # Determine spatial index
+    iy, ix = determine_index(location)
+
+    # Determine time index values
+    start_index = determine_time_index(start)
+    end_index = determine_time_index(end)
+
+    url = "{:s}/{:s}.ascii?{}[{}:{}][{:03d}][{:03d}]".format(GDS_URL, product, \
+        quantity, start_index, end_index, iy, ix)
+    return url
+
+def fetch_merra2_ascii_timeseries(location, filename=None, start=None, end=None, product='M2T1NXSLV', quantity='tqv'):
+    """Fetches a time series from [start] to [end] of a quantity from MERRA-2
+    products at a single point <location> and saves it in [filename].
+
+    Returns a tuple of the HTML status code and the filename"""
+
+    start = start or datetime.utcnow()
+    end = end or start + timedelta(days=1)
+
+    url = determine_gds_url(location, start, end, product, quantity)
+
+    status_code = -1
+    filename = None
+    opener = earthdata_login()
+    if opener:
+        ur.install_opener(opener)
+        request = ur.Request(url)
+        r = ur.urlopen(request)
+
+        date_fmt = "%Y%m%dT%H:%M:%S"
+        if start.time() == time(0,0) and end.time() == time(0,0):
+            # No time part, in start or end, remove from filename
+            date_fmt = "%Y%m%d"
+
+        filename = filename or "{}_{}_{}-{}.asc".format(product, quantity, start.strftime(date_fmt), end.strftime(date_fmt))
+        with open(filename, 'wb') as f:
+            f.write(r.read())
+        status_code = r.status
+
+    return status_code, filename
+
 def read_ascii(filepath):
     """Read single parameter ASCII format files extracted from the GrADS server e.g.
-     https://goldsmr4.gesdisc.eosdis.nasa.gov/dods/M2T1NXSLV.ascii?tqv"""
+     https://goldsmr4.gesdisc.eosdis.nasa.gov/dods/M2T1NXSLV.ascii?tqv 
+     or from the output of fetch_merra2_ascii_timeseries()"""
 
-    foo_fh = open(filepath, 'r')
+    with open(filepath, 'r') as foo_fh:
 
-    in_data = False
-    data = {}
-    for line in foo_fh:
-        line = line.rstrip()
-        if len(line) == 0:
-            continue
-        if line.count(',') == 1:
-            if line[0] != '[':
-                if in_data is True:
-                    data[array_name] = array
-                    array = []
-                    array_name = line.split(',')[0]
+        in_data = False
+        data = {}
+        for line in foo_fh:
+            line = line.rstrip()
+            if len(line) == 0:
+                continue
+            if line.count(',') == 1:
+                if line[0] != '[':
+                    if in_data is True:
+                        data[array_name] = array
+                        array = []
+                        array_name = line.split(',')[0]
+                    else:
+                        in_data = True
+                        array = []
+                        array_name = line.split(',')[0]
                 else:
-                    in_data = True
-                    array = []
-                    array_name = line.split(',')[0]
-            else:
-                value = float(line.split(',')[1].strip())
-                array.append(value)
-        elif line.count(',') >= 1 and in_data is True:
-            values = [float(x.strip()) for x in line.split(',')]
-            data[array_name] = values
-            in_data = False
-    foo_fh.close()
+                    value = float(line.split(',')[1].strip())
+                    array.append(value)
+            elif line.count(',') >= 1 and in_data is True:
+                values = [float(x.strip()) for x in line.split(',')]
+                data[array_name] = values
+                in_data = False
+        foo_fh.close()
 
     return data
 
@@ -176,6 +264,21 @@ def extract_timeseries(data, long_idx, lat_idx):
     return data[:,lat_idx,long_idx]
 
 def find_modis_data(location, date=datetime.utcnow(), ndays=1, products=['MODATML2','MYDATML2'], collection='61', dbg=False):
+    """Finds near-realtime MODIS products from the Aqua/Terra satellites for a
+    specific location <location>, starting at a specifc ([date]; defaults to
+    'now') for a number of days ([ndays]; defaults to 1). By default the MODIS
+    Joint Atmosphere products, MODATML2/MYDATML2 in Collection 61:
+    https://ladsweb.modaps.eosdis.nasa.gov/missions-and-measurements/products/l2-joint-atmosphere/MYDATML2/
+    are searched but this can be overridden by passing in [products] and
+    [collection]. 
+    A dictionary with the name of HDF file products as keys is returned; the
+    values for each HDF file is a dictionary of the following form:
+        url: URL link to retrieve the HDF file,
+        checksum: CRC checksum of the file (`cksum` can be used to generate
+                  the checksum and size,
+        size: size of the HDF file in bytes,
+        name: name of the HDF file,
+    """
     import modapsclient as m
     import logging
     logging.basicConfig(level=logging.WARNING)
@@ -229,7 +332,7 @@ def download_files(files, outpath):
         dl_file = files[file_id]['name']
         file_name = os.path.join(outpath, os.path.basename(dl_file))
         if os.path.exists(file_name) is False:
-            urllib.request.urlretrieve(url, file_name)
+            ur.urlretrieve(url, file_name)
             num_dl += 1
             output = check_output(['cksum', file_name])
             chunks = output.decode('ascii', 'ignore').split()

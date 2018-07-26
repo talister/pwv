@@ -107,3 +107,22 @@ class TestDetermineTimeIndex(object):
         t_value = determine_time_index(datetime(2001,12,31,23,30))
 
         assert expected_value == t_value
+
+class TestPascalMbarConversion(object):
+
+    def test_pascal_to_mbar(self):
+        expected_mbar = 0.01
+        assert expected_mbar == pascal_to_mbar(1)
+
+    def test_mbar_to_pascal(self):
+        expected_pascals = 1.0
+        assert expected_pascals == mbar_to_pascal(0.01)
+
+
+    def test_pascal_to_mbar_Quantity(self):
+        expected_mbar = 0.01
+        assert expected_mbar == pascal_to_mbar(1 * u.Pa)
+
+    def test_mbar_to_pascal(self):
+        expected_pascals = 1.0 * u.Pa
+        assert expected_pascals == mbar_to_pascal(0.01)

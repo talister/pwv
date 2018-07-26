@@ -2,6 +2,7 @@ from math import cos
 from datetime import datetime, timedelta
 
 import astropy.units as u
+PascalPerMillibar = 100.0
 
 def compute_zhd(pres, location):
     """Compute Zenith Hydrostatic Delay (ZHD) from total pressure at the
@@ -69,3 +70,16 @@ def determine_time_index(date_or_str, t0='00:30Z01Jan1980'):
     index = int(delta_t.total_seconds()/3600) + 1
 
     return index
+
+def pascal_to_mbar(pascals):
+    """Convert pressure from Pascals to millibars
+    """
+    try:
+        return pascals.value/PascalPerMillibar
+    except AttributeError:
+        return pascals/PascalPerMillibar
+
+def mbar_to_pascal(mbar):
+    """Convert pressure from millibars to Pascals
+    """
+    return mbar*PascalPerMillibar*u.Pa
