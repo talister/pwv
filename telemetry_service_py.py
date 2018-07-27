@@ -1,5 +1,5 @@
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from bokeh.plotting import figure, show
 from bokeh.palettes import Dark2_8 as palette
 
@@ -21,10 +21,10 @@ def get_telemetry(datum_name, start, end, site=None, observatory=None, telescope
     result = requests.get(BASE_URL, params=data)
 
     results = []
-    if result in [200,201]:
+    if result.status_code in [200,201]:
         results = result.json()
     else:
-        print("Error retrieving results")
+        print("Error retrieving results. Status code={}".format(result.status_code))
     return results
 
 
@@ -63,27 +63,33 @@ def output_data(data_dict, filename):
 def main():
     data_dict = {}
 
-    site = 'lsc'
-    observatory = 'lsc'
-    start = datetime(2016,7,1)
-    end = datetime(2016,7,31,23,59,59)
+    sites = ['cpt', ] # 'coj', 'elp']
+    for site in sites:
+        observatory = site
+        month = 4
+        print(site)
+        while month < 10:
+            start = datetime(2016,month,1,0,0,0)
+            end = datetime(2016,month+1,1,0,0,0) - timedelta(seconds=1)
+            print(start,end)
+            datum = 'Weather Barometric Pressure Value'
+            results = get_telemetry(datum, start, end, site=site, observatory=observatory, cadence=60*60)
+            print("Fetch complete")
+            data_dict['Pressure'] = clean_telemetry(results)
+            print("Clean complete")
+            if len(data_dict['Pressure']) > 0:
 
-    datum = 'Weather Barometric Pressure Value'
-    results = get_telemetry(datum, start, end, site=site, observatory=observatory, cadence=60*60)
-    print("Fetch complete")
-    data_dict['Pressure'] = clean_telemetry(results)
-    print("Clean complete")
+                filename = "{}_pressure_{}-{}.dat".format(site, start.strftime("%Y%m%d"), end.strftime("%Y%m%d"))
+                output_data(data_dict['Pressure'], filename)
+        #    datum = 'Weather Particulate Concentration 1.0 Micron Value'
+        #    results = get_telemetry(datum, start, end, site=site, cadence=60*60)
+        #    print("Fetch complete")
+        #    data_dict['PM1.0'] = clean_telemetry(results)
+        #    print("Clean complete")
 
-    filename = "{}_pressure_{}-{}.dat".format(site, start.strftime("%Y%m%d"), end.strftime("%Y%m%d"))
-    output_data(data_dict['Pressure'], filename)
-#    datum = 'Weather Particulate Concentration 1.0 Micron Value'
-#    results = get_telemetry(datum, start, end, site=site, cadence=60*60)
-#    print("Fetch complete")
-#    data_dict['PM1.0'] = clean_telemetry(results)
-#    print("Clean complete")
+        #    plot('Pressure', data_dict)
 
-#    plot('Pressure', data_dict)
-
+            month += 1
 
 if __name__ == "__main__":
     main()
