@@ -25,6 +25,25 @@ class TestConvertDecimalDay(object):
 
         assert expected_dt == dt
 
+    def test_2016Jun11(self):
+        # 2016 is a leap year so this is 1 day earlier
+        expected_dt = datetime(2016, 6, 11, 18, 45, 0)
+
+        decimal_day = 163.78125
+
+        dt = convert_decimal_day(decimal_day, 2016)
+
+        assert expected_dt == dt
+
+    def test_2016Jun11_dt(self):
+        expected_dt = datetime(2016, 6, 11, 18, 45, 0)
+
+        decimal_day = 163.78125
+
+        dt = convert_decimal_day(decimal_day, year=datetime(2016,1,1))
+
+        assert expected_dt == dt
+
 class TestSplitMODISfilename(object):
 
     def test_joint_atm1(self):

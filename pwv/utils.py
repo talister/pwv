@@ -122,3 +122,21 @@ def co2_ppmv(date=datetime.utcnow()):
     co2 = a0 + a1 * x + a2 * x**2
 
     return co2
+
+def make_bounding_box(location, delta=0.1, num_dp=-1):
+    """Calculate the West, South, East, North values of a bounding box around
+    <location> with [delta] degrees (defaults to 0.1)"""
+
+    lat = location.lat.deg
+    lon = location.lon.deg
+
+    north_val = max(lat+delta, lat-delta)
+    if num_dp >= 0: north_val = round(north_val, num_dp)
+    west_val  = min(lon+delta, lon-delta)
+    if num_dp >= 0: west_val = round(west_val, num_dp)
+    east_val  = max(lon+delta, lon-delta)
+    if num_dp >= 0: east_val = round(east_val, num_dp)
+    south_val = min(lat+delta, lat-delta)
+    if num_dp >= 0: south_val = round(south_val, num_dp)
+
+    return west_val, south_val, east_val, north_val

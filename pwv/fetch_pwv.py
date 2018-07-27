@@ -25,11 +25,13 @@ import netCDF4 as nc
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.ticker import MaxNLocator, AutoMinorLocator
-from pwv.utils import determine_time_index
+from pwv.utils import determine_time_index, make_bounding_box
 
-def convert_decimal_day(decimal_day):
+def convert_decimal_day(decimal_day, year=datetime.utcnow().year):
 
-    dt = datetime(datetime.utcnow().year-1, 12, 31) + timedelta(decimal_day)
+    if type(year) == datetime:
+        year = year.year
+    dt = datetime(year-1, 12, 31, 0, 0, 0, 0) + timedelta(decimal_day)
     if dt.microsecond >= 500000:
         dt += timedelta(seconds=1)
         dt = dt.replace(microsecond = 0)
@@ -286,13 +288,9 @@ def find_modis_data(location, date=datetime.utcnow(), ndays=1, products=['MODATM
 
     start_date = date.date()
     end_date = start_date+timedelta(days=ndays)
-    lat = location.lat.deg
-    lon = location.lon.deg
-    delta = 0.1
-    north_val = max(lat+delta, lat-delta)
-    west_val  = min(lon+delta, lon-delta)
-    east_val  = max(lon+delta, lon-delta)
-    south_val = min(lat+delta, lat-delta)
+
+    west_val, south_val, east_val, north_val = make_bounding_box(location)
+
     dl_files = {}
     for product in products:
         if dbg: print(product)
