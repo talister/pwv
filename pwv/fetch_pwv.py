@@ -61,7 +61,7 @@ def fetch_pwv(site, year=datetime.utcnow().year):
     # Create new datetime column
     dt = []
     for day in table['DayOfYear']:
-        new_dt = convert_decimal_day(day.value)
+        new_dt = convert_decimal_day(day.value, year)
         dt.append(new_dt)
     aa = Column(dt, name='UTC Datetime')
     table.add_column(aa)
