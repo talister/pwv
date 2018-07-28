@@ -19,6 +19,7 @@ from subprocess import check_output
 
 from astropy.table import QTable, Column
 import astropy.units as u
+from astropy.coordinates import EarthLocation
 import numpy as np
 import netCDF4 as nc
 
@@ -80,6 +81,18 @@ def map_LCO_to_GPS_sites(site_code):
                 'ELP' : 'MDO1',
                 'OGG' : 'MAUI' }
 
+    return mapping.get(site_code.upper(), None)
+
+def map_LCO_to_location(site_code):
+
+    mapping = { 'LSC' : EarthLocation(lon=-70.806885, lat= -30.169165, height= 2218.45),
+                'FTN' : EarthLocation(lon=-156.257029, lat=20.706657, height=3046.52),
+                'FTS' : EarthLocation(lon=149.070277778, lat=-31.2731666667, height=1111.8),
+                'ELP' : EarthLocation(lon=-104.02199,  lat=30.68049, height=2057.185),
+                'CPT' : EarthLocation(lon=20.8101083333, lat=-32.3806083333, height=1807),
+                'TFN' : EarthLocation(lon=-16.5117027778, lat=28.3003083333, height=2390.0),
+                'COJ' : EarthLocation(lon=149.070705556, lat=-31.2729791667, height=1168.0)
+              }
     return mapping.get(site_code.upper(), None)
 
 def read_merra2(hdf_path, datafile, columns=['PS', 'T2M', 'QV2M', 'TO3', 'TQV']):
