@@ -108,6 +108,29 @@ class TestDetermineTimeIndex(object):
 
         assert expected_value == t_value
 
+
+class TestTimeIndexToDt(object):
+    def test_scalar(self):
+        expected_dt = datetime(2018, 1, 1, 0, 30, 0, 0)
+
+        times = 736696.0208333334
+
+        dt = time_index_to_dt(times)
+
+        assert expected_dt == dt
+
+    def test_array(self):
+        expected_dt = [ datetime(2018, 4, 30, 21, 30),
+                        datetime(2018, 4, 30, 22, 30),
+                        datetime(2018, 4, 30, 23, 30)
+                      ]
+
+        times = [736815.8958333334, 736815.9375, 736815.9791666666]
+
+        dts = time_index_to_dt(times)
+
+        assert expected_dt == dts
+
 class TestPascalMbarConversion(object):
 
     def test_pascal_to_mbar(self):

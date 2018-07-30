@@ -4,6 +4,9 @@ import time
 import warnings
 
 import astropy.units as u
+from astropy.time import Time
+
+
 PascalPerMillibar = 100.0
 
 def compute_zhd(pres, location):
@@ -72,6 +75,33 @@ def determine_time_index(date_or_str, t0='00:30Z01Jan1980'):
     index = int(delta_t.total_seconds()/3600) + 1
 
     return index
+
+def time_index_to_dt(date, t0=1721423.5):
+    """Convert decimal date number from GrADS server downloads from read_ascii()
+    to datetime. The default offset [t0] is the Julian Date of 0001-01-01 00:00
+    calculated by the USNO Julian Date Converter:
+    http://aa.usno.navy.mil/jdconverter?ID=AA&year=1&month=1&day=1&era=1&hr=0&min=0&sec=0.0
+    This is because astropy and SLALIB produce the wrong answers for these early dates.
+    """
+
+    if type(date) == float:
+        dates = [date,]
+    else:
+        dates = date
+    times = Time(t0, dates, format='jd', scale='utc')
+    times_dt = []
+    for t in  times.datetime:
+        if t.microsecond >= 500000:
+            t += timedelta(seconds=1)
+            t = t.replace(microsecond = 0)
+        else:
+            t = t.replace(microsecond = 0)
+        times_dt.append(t)
+
+    if type(date) == float:
+        times_dt = times_dt[0]
+
+    return times_dt
 
 def toYearFraction(date):
     def sinceEpoch(date): # returns seconds since epoch
