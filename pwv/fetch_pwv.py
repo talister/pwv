@@ -26,7 +26,7 @@ import netCDF4 as nc
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.ticker import MaxNLocator, AutoMinorLocator
-from pwv.utils import determine_time_index, make_bounding_box
+from pwv.utils import determine_time_index, time_index_to_dt, make_bounding_box
 
 def convert_decimal_day(decimal_day, year=datetime.utcnow().year):
 
@@ -176,7 +176,6 @@ def fetch_merra2_ascii_timeseries(location, filename=None, start=None, end=None,
     url = determine_gds_url(location, start, end, product, quantity)
 
     status_code = -1
-    filename = None
     opener = earthdata_login()
     if opener:
         ur.install_opener(opener)
@@ -226,6 +225,10 @@ def read_ascii(filepath):
                 data[array_name] = values
                 in_data = False
         foo_fh.close()
+
+    if data.get('time', None) is not None:
+        times = time_index_to_dt(data['time'])
+        data['datetime'] = times
 
     return data
 
