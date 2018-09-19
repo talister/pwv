@@ -1,4 +1,4 @@
-from math import cos
+from math import cos, acos, degrees
 from datetime import datetime, timedelta
 import time
 import warnings
@@ -84,7 +84,7 @@ def time_index_to_dt(date, t0=1721423.5):
     This is because astropy and SLALIB produce the wrong answers for these early dates.
     """
 
-    if type(date) == float:
+    if type(date) == float or type(date) == int:
         dates = [date,]
     else:
         dates = date
@@ -170,3 +170,12 @@ def make_bounding_box(location, delta=0.1, num_dp=-1):
     if num_dp >= 0: south_val = round(south_val, num_dp)
 
     return west_val, south_val, east_val, north_val
+
+def airmass_to_sza(airmass):
+    """Convert airmass to solar zenith angle (for e.g. libRadtran)
+    The simple 1/cos(X) formula is used although is not very good at large
+    zenith distances"""
+
+    sza = degrees(acos(1.0/airmass))
+
+    return sza
