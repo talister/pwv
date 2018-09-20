@@ -86,7 +86,8 @@ class TestDetermineGDSUrl(object):
         assert expected_url == url
 
 class TestDatasetMapping(object):
-    def test_airs(self):
+
+    def test_airs_ozone(self):
         expected_mapping = {'server' : 'https://acdisc.gesdisc.eosdis.nasa.gov/',
                             'level' : 'Aqua_AIRS_Level3',
                             'product' : 'AIRS3STD.006',
@@ -94,6 +95,19 @@ class TestDatasetMapping(object):
                            }
 
         product = 'O3_RT'
+
+        mapping = dataset_mapping(product)
+
+        assert expected_mapping == mapping
+
+    def test_airs_water(self):
+        expected_mapping = {'server' : 'https://acdisc.gesdisc.eosdis.nasa.gov/',
+                            'level' : 'Aqua_AIRS_Level3',
+                            'product' : 'AIRS3STD.006',
+                            'PWV' : 'TotH2OVap_D'
+                           }
+
+        product = 'PWV_RT'
 
         mapping = dataset_mapping(product)
 

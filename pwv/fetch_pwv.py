@@ -210,7 +210,7 @@ def fetch_merra2_ascii_timeseries(location, filename=None, start=None, end=None,
 
 def read_ascii(filepath):
     """Read single parameter ASCII format files extracted from the GrADS server e.g.
-     https://goldsmr4.gesdisc.eosdis.nasa.gov/dods/M2T1NXSLV.ascii?tqv 
+     https://goldsmr4.gesdisc.eosdis.nasa.gov/dods/M2T1NXSLV.ascii?tqv
      or from the output of fetch_merra2_ascii_timeseries()"""
 
     with open(filepath, 'r') as foo_fh:
@@ -302,7 +302,7 @@ def find_modis_data(location, date=datetime.utcnow(), ndays=1, products=['MODATM
     Joint Atmosphere products, MODATML2/MYDATML2 in Collection 61:
     https://ladsweb.modaps.eosdis.nasa.gov/missions-and-measurements/products/l2-joint-atmosphere/MYDATML2/
     are searched but this can be overridden by passing in [products] and
-    [collection]. 
+    [collection].
     A dictionary with the name of HDF file products as keys is returned; the
     values for each HDF file is a dictionary of the following form:
         url: URL link to retrieve the HDF file,
@@ -391,6 +391,10 @@ def dataset_mapping(product):
                                 'level'  : 'Aqua_AIRS_Level3',
                                 'product': 'AIRS3STD.006',
                                 'O3'     : 'TotO3_D' },
+                 'PWV_RT'   : { 'server' : 'https://acdisc.gesdisc.eosdis.nasa.gov/',
+                                'level'  : 'Aqua_AIRS_Level3',
+                                'product': 'AIRS3STD.006',
+                                'PWV'    : 'TotH2OVap_D' },
                }
     return mappings.get(product, {})
 
@@ -549,6 +553,24 @@ def extract_opendap_data(opendap_url, DATAFIELD_NAME):
         data = np.ma.masked_array(data, np.isnan(data))
 
     return data, latitude, longitude
+
+def fetch_realtime(day, products=['O3_RT', 'PWV_RT'], dbg=False):
+
+    prior_catalog_url = None
+    prior_hdf_file = None
+    datasets = {}
+    for product in products:
+        mapping = dataset_mapping(product)
+        if len(mapping) == 4:
+            catalog_url = find_opendap_catalog(day, mapping['server'], mapping['level'], mapping['product'])
+            hdf_files = find_opendap_products(catalog_url)
+            if dbg:
+                print("Found {} products at {}".format(len(hdf_files), catalog_url))
+            data_url = determine_opendap_url(day, hdf_files, catalog_url)
+            quantity = product.split('_')[0]
+            data, latitude, longitude = extract_opendap_data(data_url[0], mapping[quantity])
+            datasets[quantity] = {'data' : data, 'lat' : latitude, 'long' : longitude}
+    return datasets
 
 def plot_merra2_pwv(hdf_path, datafile):
     import matplotlib.cm as cm
