@@ -15,6 +15,7 @@ try:
 except ImportError:
     from http.cookiejar import CookieJar
 from netrc import netrc
+import xml.etree.ElementTree as etree
 from subprocess import check_output
 
 from astropy.table import QTable, Column
@@ -22,6 +23,8 @@ import astropy.units as u
 from astropy.coordinates import EarthLocation
 import numpy as np
 import netCDF4 as nc
+from pydap.client import open_url
+from pydap.cas.urs import setup_session
 
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -117,6 +120,23 @@ def read_merra2(hdf_path, datafile, columns=['PS', 'T2M', 'QV2M', 'TO3', 'TQV'])
 
     return table
 
+def get_netrc_credentials(host='urs.earthdata.nasa.gov'):
+    """Obtains the username and password for logging into the specified [host]
+    from the ~/.netrc file"""
+
+    username = None
+    password = None
+
+    user_netrc = netrc()
+    auth = user_netrc.authenticators(host)
+    if auth is not None:
+        username = auth[0]
+        password = auth[2]
+    else:
+        print("Could not find authentication for '{}' in $HOME/.netrc")
+
+    return username, password
+
 def earthdata_login(username=None, password=None):
     """Login into NASA Earthdata system with specified username and password.
     Adapted from https://wiki.earthdata.nasa.gov/display/EL/How+To+Access+Data+With+Python
@@ -124,14 +144,7 @@ def earthdata_login(username=None, password=None):
 
     host = 'urs.earthdata.nasa.gov'
     if username is None or password is None:
-        user_netrc = netrc()
-        auth = user_netrc.authenticators(host)
-        if auth is not None:
-            username = auth[0]
-            password = auth[2]
-        else:
-            print("Could not find authentication for '{}' in $HOME/.netrc")
-            return None
+        username, password = get_netrc_credentials(host)
 
     # Create a password manager to deal with the 401 reponse that is returned from
     # Earthdata Login
@@ -172,6 +185,7 @@ def fetch_merra2_ascii_timeseries(location, filename=None, start=None, end=None,
 
     start = start or datetime.utcnow()
     end = end or start + timedelta(days=1)
+    quantity = quantity.lower()
 
     url = determine_gds_url(location, start, end, product, quantity)
 
@@ -359,7 +373,7 @@ def download_files(files, outpath):
     return num_dl
 
 def dataset_mapping(product):
-    """Define mappings for particular MODIS products <product> to dataset names.
+    """Define mappings for particular EOS products <product> to dataset names.
     If a single dataset name is given, this uses the standard latitude, longitude
     grid; otherwise a tuple of the latitude, longitude grid names to use is given"""
 
@@ -372,6 +386,11 @@ def dataset_mapping(product):
                  'MYDATML2' : joint_atm,
                  'MYD05_L2' : { 'PWV' : 'Water_Vapor_Infrared', },
                  'MOD05_L2' : { 'PWV' : 'Water_Vapor_Infrared', },
+                 # "Realtime" products
+                 'O3_RT'    : { 'server' : 'https://acdisc.gesdisc.eosdis.nasa.gov/',
+                                'level'  : 'Aqua_AIRS_Level3',
+                                'product': 'AIRS3STD.006',
+                                'O3'     : 'TotO3_D' },
                }
     return mappings.get(product, {})
 
@@ -467,6 +486,70 @@ def extract_MODIS_pwv_timeseries(hdf_path, location):
             print("Unable to find dataset mapping for PWV in {}".format(mapping.keys()))
     return times, pwv_values
 
+def find_opendap_catalog(day, opendap_server, process_level, product):
+    """Return the path to the XML OpenDap catalog of products.
+    This takes <day> (a `datetime`), the <opendap_server> (e.g. https://acdisc.gesdisc.eosdis.nasa.gov/),
+    the <process_level> (e.g. 'Aqua_AIRS_Level3') and the product (e.g. 'AIRS3STD.006')
+    """
+
+    pieces = [ 'opendap', process_level, product, str(day.year), 'catalog.xml']
+    path = "/".join(s for s in pieces)
+    url = urljoin(opendap_server, path)
+
+    return url
+
+def find_opendap_products(catalog_url, max_files=400):
+    """Parses the passed THREDDS Catalog XML file at <catalog_url> and returns
+    the names of the HDF files in the catalog as a list"""
+    hdf_files = []
+
+    with ur.urlopen(catalog_url) as response:
+        tree = etree.parse(response)
+        for item in tree.iter():
+            if item.tag.endswith('dataset'):
+                if item.attrib['name'].endswith('.hdf'):
+                    hdf_files.append(item.attrib['name'])
+            if len(hdf_files) >= max_files:
+                break
+        hdf_files.sort()
+
+    return hdf_files
+
+def determine_opendap_url(day, hdf_files_list, catalog_url):
+    """Look for HDF files containing the <day> in the list of <hdf_files_list> (from
+    find_opendap_products()).
+    Returns a list of URLs to obtain the products or for remote query with PyDAP"""
+
+    hdf_files = [hdf for hdf in hdf_files_list if day.strftime("%Y.%m.%d") in hdf]
+    hdf_urls = [catalog_url.replace('catalog.xml', hdf) for hdf in hdf_files]
+
+    return hdf_urls
+
+def extract_opendap_data(opendap_url, DATAFIELD_NAME):
+    username, password = get_netrc_credentials()
+    if username and password:
+        session = setup_session(username, password, check_url=opendap_url)
+        dataset = open_url(opendap_url, session=session)
+        data3D = dataset[DATAFIELD_NAME]
+        data = data3D.data[:,:]
+
+        # Read geolocation dataset.
+        # For...reasons... the Latitude and Longitude arrays come back as 1D
+        # via pydap rather than the correct 2D ones, via pyhdf. So we need
+        # to grow them back to the right shape
+        lat = dataset['Latitude'].data
+        lon = dataset['Longitude'].data
+        latitude = np.array([lat[:,:],]*lon.shape[0]).transpose()
+        longitude = np.array([lon[:,:],]*lat.shape[0])
+
+        # Handle fill value.
+        attrs = data3D.attributes
+        fillvalue=attrs["_FillValue"]
+        data[data == fillvalue] = np.nan
+        data = np.ma.masked_array(data, np.isnan(data))
+
+    return data, latitude, longitude
+
 def plot_merra2_pwv(hdf_path, datafile):
     import matplotlib.cm as cm
     from mpl_toolkits.basemap import Basemap
@@ -557,7 +640,7 @@ def plot_modis(basename, location, data, latitude, longitude, units, long_name):
     cb = m.colorbar()
     cb.set_label(units)
     basename = os.path.basename(basename)
-    plt.title('{0}\n{1}\n'.format(basename, long_name))
+    plt.title('{0}\n{1}'.format(basename, long_name))
     fig = plt.gcf()
     pngfile = "{0}.py.png".format(basename)
     fig.savefig(pngfile)

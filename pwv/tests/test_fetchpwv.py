@@ -84,3 +84,31 @@ class TestDetermineGDSUrl(object):
         url = determine_gds_url(loc, start, end, quantity='u50m')
 
         assert expected_url == url
+
+class TestDatasetMapping(object):
+    def test_airs(self):
+        expected_mapping = {'server' : 'https://acdisc.gesdisc.eosdis.nasa.gov/',
+                            'level' : 'Aqua_AIRS_Level3',
+                            'product' : 'AIRS3STD.006',
+                            'O3' : 'TotO3_D'
+                           }
+
+        product = 'O3_RT'
+
+        mapping = dataset_mapping(product)
+
+        assert expected_mapping == mapping
+
+class TestFindOpenDapcatalog(object):
+
+    def test_airs(self):
+        expected_url = 'https://acdisc.gesdisc.eosdis.nasa.gov/opendap/Aqua_AIRS_Level3/AIRS3STD.006/2018/catalog.xml'
+
+        day = datetime(2018, 9, 15, 10, 15)
+        server = 'https://acdisc.gesdisc.eosdis.nasa.gov/'
+        level = 'Aqua_AIRS_Level3'
+        product = 'AIRS3STD.006'
+
+        url = find_opendap_catalog(day, server, level, product)
+
+        assert expected_url == url
