@@ -44,6 +44,38 @@ class TestConvertDecimalDay(object):
 
         assert expected_dt == dt
 
+class TestDetermineIndex(object):
+    def setup_method(self):
+        self.FTN = EarthLocation(lon=-156.257029, lat=20.706657, height=3046.52)
+        self.GES_example = EarthLocation(lon=-75.625, lat=37.375, height=0)
+
+    def test_merra2_ftn(self):
+        expected_long_index = 38
+        expected_lat_index = 222
+
+        lat_index, long_index = determine_index(self.FTN)
+
+        assert expected_long_index == long_index
+        assert expected_lat_index == lat_index
+
+    def test_gldas_example(self):
+        expected_long_index = 418
+        expected_lat_index = 390
+
+        lat_index, long_index = determine_index(self.GES_example, lon0=-179.875, lat0=-59.875, lonres=0.25, latres=0.25)
+
+        assert expected_long_index == long_index
+        assert expected_lat_index == lat_index
+
+    def test_airs_ftn(self):
+        expected_long_index = 23
+        expected_lat_index = 69
+
+        lat_index, long_index = determine_index(self.FTN, lon0=-179.030, lat0=89.03, lonres=359/360.0, latres=179/180.0)
+
+        assert expected_long_index == long_index
+        assert expected_lat_index == lat_index
+
 class TestSplitMODISfilename(object):
 
     def test_joint_atm1(self):

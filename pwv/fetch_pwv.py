@@ -284,8 +284,14 @@ def determine_cell(location, lats, longs):
     return lat_idx, long_idx
 
 def determine_index(location, lon0=-180, lat0=-90, lonres=0.625, latres=0.5):
-    long_idx = int((location.lon.degree - lon0)/lonres) + 1
-    lat_idx  = int((location.lat.degree - lat0)/latres) + 1
+    if lon0 > 0:
+        long_idx = int((lon0 - location.lon.degree)/lonres) + 1
+    else:
+        long_idx = int((location.lon.degree - lon0)/lonres) + 1
+    if lat0 > 0:
+        lat_idx  = int((lat0- location.lat.degree)/latres) + 1
+    else:
+        lat_idx  = int((location.lat.degree - lat0)/latres) + 1
 
     return lat_idx, long_idx
 
@@ -568,6 +574,8 @@ def fetch_realtime(day, products=['O3_RT', 'PWV_RT'], dbg=False):
                 print("Found {} products at {}".format(len(hdf_files), catalog_url))
             data_url = determine_opendap_url(day, hdf_files, catalog_url)
             quantity = product.split('_')[0]
+            if dbg:
+                print("Fetching {}".format(data_url))
             data, latitude, longitude = extract_opendap_data(data_url[0], mapping[quantity])
             datasets[quantity] = {'data' : data, 'lat' : latitude, 'long' : longitude}
     return datasets
