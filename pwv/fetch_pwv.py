@@ -44,8 +44,21 @@ def convert_decimal_day(decimal_day, year=datetime.utcnow().year):
     return dt
 
 def fetch_pwv(site, year=datetime.utcnow().year):
+    """Download the SuomiNet precipitable water vapor for the specified <site>
+    and the particular [year] (defaults to current one if not specified).
+    Returns an AstroPy Q(uantity)Table with columns:
+        DayOfYear: decimal day of the year
+        PWV: precipitable water vapour (in mm; -9.9 for missing value)
+        PWVerr: error on precipitable water vapour (in mm)
+        ZenithDelay: zenith (total?) delay (in mm)
+        SurfacePressure: surface pressure (in millibars)
+        SurfaceTemp: surface temperature (in degrees C)
+        SurfaceRH: surface relative humidty (%)
+        UTC Datetime: day of the year comverted to a datetime (computed, not in original)
+    Masking of bad/missing values is not done.
+    Reference: https://www.suominet.ucar.edu/data.html"""
 
-    url = "http://www.suominet.ucar.edu/data/staYrDayGlob/"
+    url = "https://www.cosmic.ucar.edu/suominet/data/staYrDayGlob/"
 
     gps_file = "{}_{:4d}global.plt".format(site, year)
     dl_link = urljoin(url, gps_file)
@@ -621,22 +634,36 @@ def plot_merra2_pwv(hdf_path, datafile):
 
     return filename
 
-def plot_pwv_timeseries(CTIO_table, times, CTIO_pwv, filename='CTIO_GPS_MERRA2_comp.png'):
+def plot_pwv_timeseries(pwv_table, times=None, merra2_pwv=None, site='CTIO', filename=None):
+    """Plot a PWV timeseries table (from fetch_pwv()) and optionally a MERRA-2
+    comparison from extract_MODIS_pwv_timeseries() ([times] and [merra2_pwv]). [site]
+    is used as the prefix to the labels and to the filename (if not specified)"""
+
     fig, ax = plt.subplots()
-    ax.plot(CTIO_table['UTC Datetime'], CTIO_table['PWV'], label='CTIO GPS')
-    ax.plot(times, CTIO_pwv, label='CTIO MERRA-2')
+    ax.plot(pwv_table['UTC Datetime'], pwv_table['PWV'], label=site+' GPS')
+    if times and merra2_pwv:
+        ax.plot(times, merra2_pwv, label=site+' MERRA-2')
+    else:
+        times = [datetime.max, datetime.min]
     ylims = ax.get_ylim()
     ax.set_ylim(0, ylims[1])
     ax.set_title('Precipitable Water Vapour')
     ax.set_ylabel('PWV (mm)')
 
-    hours = mdates.HourLocator(range(0,25,3))
-    hoursFmt = mdates.DateFormatter('%m-%d %H:%M')
-    ax.xaxis.set_major_locator(hours)
-    ax.xaxis.set_major_formatter(hoursFmt)
-    hours = mdates.HourLocator(range(0,25,1))
-    ax.xaxis.set_minor_locator(hours)
-    ax.format_xdata = mdates.DateFormatter('%Y-%m-%d %H:%M')
+    timespan = max(pwv_table['UTC Datetime'][-1], times[1]) - min(pwv_table['UTC Datetime'][0], times[0])
+    if timespan.days <= 2:
+        hours = mdates.HourLocator(range(0,25,3))
+        hoursFmt = mdates.DateFormatter('%m-%d %H:%M')
+        ax.xaxis.set_major_locator(hours)
+        ax.xaxis.set_major_formatter(hoursFmt)
+        hours = mdates.HourLocator(range(0,25,1))
+        ax.xaxis.set_minor_locator(hours)
+        ax.format_xdata = mdates.DateFormatter('%Y-%m-%d %H:%M')
+    else:
+        dates = mdates.AutoDateLocator()
+        ax.xaxis.set_major_locator(dates)
+        datesFmt = mdates.AutoDateFormatter(dates)
+        ax.xaxis.set_major_formatter(datesFmt)
 
     ax.yaxis.set_major_locator(MaxNLocator(integer=True))
     minorLocator = AutoMinorLocator()
@@ -644,6 +671,8 @@ def plot_pwv_timeseries(CTIO_table, times, CTIO_pwv, filename='CTIO_GPS_MERRA2_c
 
     plt.legend()
     fig.autofmt_xdate()
+    if not filename:
+        filename = site+'_GPS_MERRA2_comp.png'
     plt.savefig(filename, format='png')
 
     return filename
