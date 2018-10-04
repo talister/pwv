@@ -509,7 +509,7 @@ def extract_MODIS_pwv_timeseries(hdf_path, location):
             print("Unable to find dataset mapping for PWV in {}".format(mapping.keys()))
     return times, pwv_values
 
-def determine_opendap_agg_url(day, opendap_server, process_level, product):
+def determine_opendap_agg_base_url(day, opendap_server, process_level, product):
     """Return the base URL for the AIRS Aggregated Data Service in OPeNDAP
     This takes <day> (a `datetime`), the <opendap_server> (e.g. https://acdisc.gesdisc.eosdis.nasa.gov/),
     the <process_level> (e.g. 'Aqua_AIRS_Level3') and the product (e.g. 'AIRS3STD.006')
@@ -605,6 +605,10 @@ def fetch_realtime(day, products=['O3_RT', 'PWV_RT'], dbg=False):
             datasets[quantity] = {'data' : data, 'lat' : latitude, 'long' : longitude}
     return datasets
 
+def fetch_airs_ascii_timeseries(location, filename=None, start=None, end=None, products=['O3_RT', 'PWV_RT']):
+
+    return status_code, filename
+    
 def plot_merra2_pwv(hdf_path, datafile):
     import matplotlib.cm as cm
     from mpl_toolkits.basemap import Basemap
