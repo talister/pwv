@@ -509,6 +509,18 @@ def extract_MODIS_pwv_timeseries(hdf_path, location):
             print("Unable to find dataset mapping for PWV in {}".format(mapping.keys()))
     return times, pwv_values
 
+def determine_opendap_agg_url(day, opendap_server, process_level, product):
+    """Return the base URL for the AIRS Aggregated Data Service in OPeNDAP
+    This takes <day> (a `datetime`), the <opendap_server> (e.g. https://acdisc.gesdisc.eosdis.nasa.gov/),
+    the <process_level> (e.g. 'Aqua_AIRS_Level3') and the product (e.g. 'AIRS3STD.006')
+    """
+
+    pieces = [ 'opendap', 'ncml/aggregation', product, product+"_Aggregation_"+str(day.year)+".ncml.ascii"]
+    path = "/".join(s for s in pieces)
+    url = urljoin(opendap_server, path)
+
+    return url
+
 def find_opendap_catalog(day, opendap_server, process_level, product):
     """Return the path to the XML OpenDap catalog of products.
     This takes <day> (a `datetime`), the <opendap_server> (e.g. https://acdisc.gesdisc.eosdis.nasa.gov/),

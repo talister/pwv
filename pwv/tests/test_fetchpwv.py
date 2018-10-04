@@ -158,3 +158,29 @@ class TestFindOpenDapcatalog(object):
         url = find_opendap_catalog(day, server, level, product)
 
         assert expected_url == url
+
+class TestDetermineOpenDAPaggUrl(object):
+
+    def test_airs_2009(self):
+        expected_url = 'https://acdisc.gesdisc.eosdis.nasa.gov/opendap/ncml/aggregation/AIRS3STD.006/AIRS3STD.006_Aggregation_2009.ncml.ascii'
+
+        day = datetime(2009, 9, 15, 10, 15)
+        server = 'https://acdisc.gesdisc.eosdis.nasa.gov/'
+        level = 'Aqua_AIRS_Level3'
+        product = 'AIRS3STD.006'
+
+        url = determine_opendap_agg_url(day, server, level, product)
+
+        assert expected_url == url
+
+    def test_airs_2018(self):
+        expected_url = 'https://acdisc.gesdisc.eosdis.nasa.gov/opendap/ncml/aggregation/AIRS3STD.006/AIRS3STD.006_Aggregation_2018.ncml.ascii'
+
+        day = datetime(2018, 9, 15, 10, 15)
+        server = 'https://acdisc.gesdisc.eosdis.nasa.gov/'
+        level = 'Aqua_AIRS_Level3'
+        product = 'AIRS3STD.006'
+
+        url = determine_opendap_agg_url(day, server, level, product)
+
+        assert expected_url == url
