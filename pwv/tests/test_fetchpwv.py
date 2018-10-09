@@ -216,3 +216,28 @@ class TestDetermineOpenDAPAggUrl(object):
         url = determine_opendap_agg_url(location, start, end, server, level, product, variables)
 
         assert expected_url == url
+
+class TestReadAscii(object):
+
+    def setup_method(self):
+        self.DAP_location =  EarthLocation(lon=-76.877, lat=39.1495, height=42)
+        self.merra2_ascii = os.path.join('pwv', 'tests', 'data', 'M2T1NXSLV_tqv_20090101-20090104.asc')
+
+    def test_merra2(self):
+        expected_keys = ['tqv', 'time', 'lat', 'datetime']
+        expected_num = 73
+        expected_tqv_0 = 3.0582914
+        expected_tqv_last = 8.244712
+        expected_dt_0 = datetime(2009, 1, 1, 0, 30)
+        expected_dt_last = datetime(2009, 1, 4, 0, 30)
+
+        data = read_ascii(self.merra2_ascii)
+
+        assert expected_keys == list(data.keys())
+        for key in expected_keys:
+            if key not in ['lat', 'lon']:
+                assert expected_num == len(data[key]), "Check on {} failed".format(key)
+        assert expected_tqv_0 == data['tqv'][0]
+        assert expected_tqv_last == data['tqv'][-1]
+        assert expected_dt_0 == data['datetime'][0]
+        assert expected_dt_last == data['datetime'][-1]
