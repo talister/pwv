@@ -221,40 +221,86 @@ def fetch_merra2_ascii_timeseries(location, filename=None, start=None, end=None,
 
     return status_code, filename
 
-def read_ascii(filepath):
+def read_ascii(filepath, dbg=False):
     """Read single parameter ASCII format files extracted from the GrADS server e.g.
      https://goldsmr4.gesdisc.eosdis.nasa.gov/dods/M2T1NXSLV.ascii?tqv
      or from the output of fetch_merra2_ascii_timeseries()"""
 
     with open(filepath, 'r') as foo_fh:
 
-        in_data = False
-        data = {}
-        for line in foo_fh:
-            line = line.rstrip()
-            if len(line) == 0:
-                continue
-            if line.count(',') == 1:
-                if line[0] != '[':
-                    if in_data is True:
-                        data[array_name] = array
-                        array = []
-                        array_name = line.split(',')[0]
+        first_line = foo_fh.readline()
+        if 'Dataset:' in first_line.strip():
+            # JD for 2002-01-01, starting point of aggregation values
+            t0 = 2452275.5
+            # OpenDAP format file
+            data = {}
+            for line in foo_fh:
+                line = line.rstrip()
+                if len(line) == 0:
+                    continue
+                if dbg: print(line)
+                if '[' not in line:
+                    chunks = line.split(',')
+                    if len(chunks) == 2:
+                        quantity = chunks[0]
+                        value = chunks[1]
+                        try:
+                            value = float(value)
+                        except ValueError:
+                            pass
                     else:
-                        in_data = True
-                        array = []
-                        array_name = line.split(',')[0]
+                        quantity = chunks[0]
+                        value = [float(x.strip()) for x in chunks[1:]]
+                    data[quantity] = value
                 else:
-                    value = float(line.split(',')[1].strip())
-                    array.append(value)
-            elif line.count(',') >= 1 and in_data is True:
-                values = [float(x.strip()) for x in line.split(',')]
-                data[array_name] = values
-                in_data = False
+                    chunks = line.split(',')
+                    array_name = chunks[0]
+                    value = chunks[1]
+                    try:
+                        value = float(value)
+                    except ValueError:
+                        pass
+                    index = array_name.find('[')
+                    if index > 0:
+                        array_name = array_name[0:index]
+                    if array_name not in data:
+                        # New quantity
+                        data[array_name] = []
+                    data[array_name].append(value)
+        else:
+            # GDS format file
+            t0=1721423.5
+            status = foo_fh.seek(0)
+
+            in_data = False
+            data = {}
+            for line in foo_fh:
+                line = line.rstrip()
+                if len(line) == 0:
+                    continue
+                if dbg: print(line, in_data)
+                if line.count(',') == 1:
+                    if line[0] != '[':
+                        if in_data is True:
+                            data[array_name] = array
+                            array = []
+                            array_name = line.split(',')[0]
+                        else:
+                            in_data = True
+                            array = []
+                            array_name = line.split(',')[0]
+                            if dbg: print("Created array_name", array_name)
+                    else:
+                        value = float(line.split(',')[1].strip())
+                        array.append(value)
+                elif line.count(',') >= 1 and in_data is True:
+                    values = [float(x.strip()) for x in line.split(',')]
+                    data[array_name] = values
+                    in_data = False
         foo_fh.close()
 
     if data.get('time', None) is not None:
-        times = time_index_to_dt(data['time'])
+        times = time_index_to_dt(data['time'], t0)
         data['datetime'] = times
 
     return data

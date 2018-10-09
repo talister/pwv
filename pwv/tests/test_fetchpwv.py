@@ -222,6 +222,7 @@ class TestReadAscii(object):
     def setup_method(self):
         self.DAP_location =  EarthLocation(lon=-76.877, lat=39.1495, height=42)
         self.merra2_ascii = os.path.join('pwv', 'tests', 'data', 'M2T1NXSLV_tqv_20090101-20090104.asc')
+        self.aqua_ascii = os.path.join('pwv', 'tests', 'data', 'Aqua_TotO3_D_TotH2OVap_D_test.asc')
 
     def test_merra2(self):
         expected_keys = ['tqv', 'time', 'lat', 'datetime']
@@ -239,5 +240,28 @@ class TestReadAscii(object):
                 assert expected_num == len(data[key]), "Check on {} failed".format(key)
         assert expected_tqv_0 == data['tqv'][0]
         assert expected_tqv_last == data['tqv'][-1]
+        assert expected_dt_0 == data['datetime'][0]
+        assert expected_dt_last == data['datetime'][-1]
+
+    def test_aqua(self):
+        expected_keys = ['Longitude', 'Latitude', 'TotH2OVap_D', 'TotO3_D', 'time', 'datetime']
+        expected_num = 3
+        expected_pwv_0 =  2.91797
+        expected_pwv_last =  6.09766
+        expected_o3_0 =  353.0
+        expected_o3_last =  355.25
+        expected_dt_0 = datetime(2009, 1, 1, 0, 0)
+        expected_dt_last = datetime(2009, 1, 3, 0, 0)
+
+        data = read_ascii(self.aqua_ascii)
+
+        assert expected_keys == list(data.keys())
+        for key in expected_keys:
+            if key not in ['Latitude', 'Longitude']:
+                assert expected_num == len(data[key]), "Check on {} failed".format(key)
+        assert expected_pwv_0 == data['TotH2OVap_D'][0]
+        assert expected_pwv_last == data['TotH2OVap_D'][-1]
+        assert expected_o3_0 == data['TotO3_D'][0]
+        assert expected_o3_last == data['TotO3_D'][-1]
         assert expected_dt_0 == data['datetime'][0]
         assert expected_dt_last == data['datetime'][-1]
