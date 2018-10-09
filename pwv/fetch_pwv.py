@@ -521,6 +521,24 @@ def determine_opendap_agg_base_url(day, opendap_server, process_level, product):
 
     return url
 
+def determine_opendap_agg_url(location, start, end, server, level, product, variables):
+
+    url = None
+
+    url = determine_opendap_agg_base_url(start, server, level, product)
+    lat_index, long_index = determine_index(location, lat0=90, lonres=1, latres=1)
+    lat_index = max(0,lat_index-1)
+    long_index = max(0,long_index-1)
+    start_time_index = int(start.strftime("%j"))-1
+    end_time_index = int(end.strftime("%j"))-1
+
+    url += "?"
+    for quantity in variables:
+        url += "{:s}[{:d}:{:d}][{:d}:{:d}][{:d}:{:d}],".format(quantity, start_time_index, end_time_index, lat_index, lat_index, long_index,long_index)
+    # Add trailing spatial and temporal indexes
+    url += "Latitude[{:d}:{:d}],Longitude[{:d}:{:d}],time[{:d}:{:d}]".format(lat_index, lat_index, long_index,long_index, start_time_index, end_time_index)
+    return url
+
 def find_opendap_catalog(day, opendap_server, process_level, product):
     """Return the path to the XML OpenDap catalog of products.
     This takes <day> (a `datetime`), the <opendap_server> (e.g. https://acdisc.gesdisc.eosdis.nasa.gov/),
@@ -606,6 +624,29 @@ def fetch_realtime(day, products=['O3_RT', 'PWV_RT'], dbg=False):
     return datasets
 
 def fetch_airs_ascii_timeseries(location, filename=None, start=None, end=None, products=['O3_RT', 'PWV_RT']):
+
+    mapping = dataset_mapping(products[0])
+    variables = [dataset_mapping(product)[product.split('_')[0]] for product in products]
+
+    agg_url = determine_opendap_agg_url(location, start, end, mapping['server'], mapping['level'], mapping['product'], variables)
+
+    quantities = "_".join(variables)
+    status_code = -1
+    opener = earthdata_login()
+    if opener:
+        ur.install_opener(opener)
+        request = ur.Request(agg_url)
+        r = ur.urlopen(request)
+
+        date_fmt = "%Y%m%dT%H%M%S"
+        if start.time() == time(0,0) and end.time() == time(0,0):
+            # No time part, in start or end, remove from filename
+            date_fmt = "%Y%m%d"
+
+        filename = filename or "{}_{}_{}-{}.asc".format(mapping['level'], quantities, start.strftime(date_fmt), end.strftime(date_fmt))
+        with open(filename, 'wb') as f:
+            f.write(r.read())
+        status_code = r.status
 
     return status_code, filename
     

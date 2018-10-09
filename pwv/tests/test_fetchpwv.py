@@ -184,3 +184,35 @@ class TestDetermineOpenDAPAggBaseUrl(object):
         url = determine_opendap_agg_base_url(day, server, level, product)
 
         assert expected_url == url
+
+class TestDetermineOpenDAPAggUrl(object):
+
+    def test_airs_2009_O3(self):
+        expected_url = 'https://acdisc.gesdisc.eosdis.nasa.gov/opendap/ncml/aggregation/AIRS3STD.006/AIRS3STD.006_Aggregation_2009.ncml.ascii?TotO3_D[0:364][50:50][103:103],Latitude[50:50],Longitude[103:103],time[0:364]'
+
+        start = datetime(2009, 1, 1, 10, 15)
+        end = datetime(2009, 12, 31, 23, 59)
+        server = 'https://acdisc.gesdisc.eosdis.nasa.gov/'
+        level = 'Aqua_AIRS_Level3'
+        product = 'AIRS3STD.006'
+        location =  EarthLocation(lon=-76.877, lat=39.1495, height=42)
+        variables = ['TotO3_D']
+
+        url = determine_opendap_agg_url(location, start, end, server, level, product, variables)
+
+        assert expected_url == url
+
+    def test_airs_2009_O3_H2O(self):
+        expected_url = 'https://acdisc.gesdisc.eosdis.nasa.gov/opendap/ncml/aggregation/AIRS3STD.006/AIRS3STD.006_Aggregation_2009.ncml.ascii?TotO3_D[0:364][50:50][103:103],TotH2OVap_D[0:364][50:50][103:103],Latitude[50:50],Longitude[103:103],time[0:364]'
+
+        start = datetime(2009, 1, 1, 10, 15)
+        end = datetime(2009, 12, 31, 23, 59)
+        server = 'https://acdisc.gesdisc.eosdis.nasa.gov/'
+        level = 'Aqua_AIRS_Level3'
+        product = 'AIRS3STD.006'
+        location =  EarthLocation(lon=-76.877, lat=39.1495, height=42)
+        variables = ['TotO3_D', 'TotH2OVap_D']
+
+        url = determine_opendap_agg_url(location, start, end, server, level, product, variables)
+
+        assert expected_url == url
