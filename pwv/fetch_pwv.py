@@ -50,7 +50,7 @@ def fetch_pwv(site, year=datetime.utcnow().year):
         DayOfYear: decimal day of the year
         PWV: precipitable water vapour (in mm; -9.9 for missing value)
         PWVerr: error on precipitable water vapour (in mm)
-        ZenithDelay: zenith (total?) delay (in mm)
+        TotalZenithDelay: total zenith delay (in mm)
         SurfacePressure: surface pressure (in millibars)
         SurfaceTemp: surface temperature (in degrees C)
         SurfaceRH: surface relative humidty (%)
@@ -66,12 +66,12 @@ def fetch_pwv(site, year=datetime.utcnow().year):
     units={ 'DayOfYear' : u.day,
             'PWV' : u.mm,
             'PWVerr' : u.mm,
-            'ZenithDelay' : u.mm,
+            'TotalZenithDelay' : u.mm,
             'SurfacePressure' : mbar,
             'SurfaceTemp' : u.deg_C,
             'SurfaceRH' : u.percent
            }
-    table = QTable.read(dl_link, format='ascii', names=["DayOfYear", "PWV", "PWVerr", "ZenithDelay", "SurfacePressure", "SurfaceTemp", "SurfaceRH"])
+    table = QTable.read(dl_link, format='ascii', names=["DayOfYear", "PWV", "PWVerr", "TotalZenithDelay", "SurfacePressure", "SurfaceTemp", "SurfaceRH"])
     for column in table.columns:
         table[column].unit = units[column]
 
