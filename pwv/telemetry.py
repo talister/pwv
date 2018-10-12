@@ -2,6 +2,10 @@ from datetime import datetime, timedelta
 
 from elasticsearch import Elasticsearch
 from elasticsearch_dsl import Search
+import numpy as np
+from scipy.interpolate import interp1d
+
+from pwv.utils import round_datetime
 
 def map_quantity_to_LCO_datum(quantity):
     """Simple mapper from concepts (<quantity>) to LCO telemetry datum name"""
@@ -37,3 +41,33 @@ def query_LCO_telemetry(site, start, end, datum='Weather Barometric Pressure Val
     sorted_data = sorted(data, key=lambda k:  k['UTC Datetime'])
 
     return sorted_data
+
+def interpolate_LCO_telemetry(data, interval=300, kind='linear'):
+    """Interpolates the LCO telemetry in <data> (assumed to be list of dicts
+    containing 'UTC Datetime' and a datum - from query_LCO_telemetry()) to
+    a uniform spacing of [interval] seconds via interpolation method [kind] (as
+    defined in `scipy.interpolate.interp1d`
+    (https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.interp1d.html)
+    Returns numpy arrays of the interpolated timestamps (datetimes) and values"""
+
+    times = [i['UTC Datetime'] for i in data]
+    timestamps = [t.timestamp() for t in times]
+    quantity = [key for key in data[0].keys() if key != 'UTC Datetime'][0]
+    values = [x[quantity] for x in data]
+
+    # Determine start and end times (rounded to the interval) and number of steps
+    start = round_datetime(times[0], interval, round_up=True)
+    end = round_datetime(times[-1], interval, round_up=False)
+    delta = timedelta(seconds=interval)
+    steps = int((end - start) / delta)
+    increments = range(0, steps) * np.array([delta]*steps)
+    # Generate new datetimes and timestamps
+    interp_times = start + increments
+    interp_timestamps = [x.timestamp() for x in interp_times]
+
+    # Interpolate the data and then evaluate it at each of the
+    # interpolated timestamps
+    interp_func = interp1d(timestamps, values, kind)
+    interp_values = interp_func(interp_timestamps)
+
+    return interp_times, interp_values

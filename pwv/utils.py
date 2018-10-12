@@ -118,6 +118,20 @@ def toYearFraction(date):
 
     return date.year + fraction
 
+def round_datetime(date_to_round, round_mins=10, round_up=False):
+    """Rounds the passed datetime object, <date_to_round>, to the
+    'floor' (default) or the 'ceiling' (if [roundup=True]) of
+    the nearest passed amount (which defaults to 10min)"""
+
+    correct_mins = 0
+    if round_up:
+        correct_mins = round_mins
+    date_to_round = date_to_round - timedelta(minutes=(date_to_round.minute % round_mins)-correct_mins,
+                        seconds=date_to_round.second,
+                        microseconds=date_to_round.microsecond)
+
+    return date_to_round
+
 def pascal_to_mbar(pascals):
     """Convert pressure from Pascals to millibars
     """
