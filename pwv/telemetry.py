@@ -56,8 +56,8 @@ def interpolate_LCO_telemetry(data, interval=300, kind='linear'):
     values = [x[quantity] for x in data]
 
     # Determine start and end times (rounded to the interval) and number of steps
-    start = round_datetime(times[0], interval, round_up=True)
-    end = round_datetime(times[-1], interval, round_up=False)
+    start = round_datetime(times[0], interval/60.0, round_up=True)
+    end = round_datetime(times[-1], interval/60.0, round_up=False)
     delta = timedelta(seconds=interval)
     steps = int((end - start) / delta)
     increments = range(0, steps) * np.array([delta]*steps)
