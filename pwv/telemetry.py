@@ -19,11 +19,11 @@ def query_LCO_telemetry(site, start, end, datum='Weather Barometric Pressure Val
 
     A list of dictionaries, containing {'UTC Datetime', <datum>} is returned, sorted into chronological order"""
 
-    client = Elasticsearch(hosts='elasticsearch.lco.gtn')
+    client = Elasticsearch(hosts='elasticsearch.lco.gtn', retry_on_timeout=True)
     s = Search(using=client, index='mysql-telemetry-*')
     s = s.query('match', site=site)
     s = s.query('match', datumname=datum)
-    s = s.filter('range', timestamp={'gte': start.strftime("%Y-%m-%dT%H:%M:%S"), 
+    s = s.filter('range', timestamp={'gte': start.strftime("%Y-%m-%dT%H:%M:%S"),
                                      'lte': end.strftime("%Y-%m-%dT%H:%M:%S")})
     s = s.filter('range', value_float = {'gt': 0.0})
 
