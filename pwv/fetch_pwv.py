@@ -30,6 +30,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.ticker import MaxNLocator, AutoMinorLocator
 from pwv.utils import determine_time_index, time_index_to_dt, make_bounding_box
+from pwv.telemetry import map_quantity_to_LCO_datum, query_LCO_telemetry, interpolate_LCO_telemetry
 
 def convert_decimal_day(decimal_day, year=datetime.utcnow().year):
 
@@ -695,7 +696,41 @@ def fetch_airs_ascii_timeseries(location, filename=None, start=None, end=None, p
         status_code = r.status
 
     return status_code, filename
-    
+
+def fetch_LCO_weather(site_code, start=None, end=None, interval=600, dbg=False):
+    """Fetch LCO weather (temperature and pressure) for LCO <site_code> (e.g. 'ogg')
+    between [start] and [end] (defaults to start of current year and now) interpolated
+    to a spacing of [interval] seconds (defaults to 600s).
+    Returns an AstroPy QTable of UTC datetime and temperature and pressure"""
+
+    start = start or datetime(datetime.utcnow().year, 1, 1)
+    end = end or datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    nrows = int((end-start)/ timedelta(seconds=interval))
+
+    # Construct a Q(uantity)Table and a column of datetime64's from <start> to
+    # <end> with [interval] spacing
+    table = QTable()
+    dt = np.arange(start, end, step=interval, dtype='datetime64[s]')
+    aa = Column(dt, name='UTC Datetime')
+    table.add_column(aa)
+
+    for quantity in ['temperature', 'pressure']:
+        datum = map_quantity_to_LCO_datum(quantity)
+        data = query_LCO_telemetry(site_code, start, end, datum)
+        interp_timestamps, interp_values = interpolate_LCO_telemetry(data, interval)
+        if dbg: print(quantity, interp_timestamps[0], interp_timestamps[-1], len(interp_timestamps), len(interp_values))
+
+        # Check if the interpolated dataset starts late or ends early and pad
+        # accordingly
+        num_before = max(int((interp_timestamps[0]-start) / timedelta(seconds=interval)), 0)
+        num_after  = max(int((end-interp_timestamps[-1]) / timedelta(seconds=interval)), 0)
+        pad_values = np.pad(interp_values, (num_before, num_after), 'edge')
+        if dbg: print("Padding by {} before, {} after, new length={}".format(num_before, num_after, len(pad_values)))
+        # Trim padded array to right length, turn into a column and add to table
+        col = Column(pad_values[0:nrows], name=quantity)
+        table.add_column(col)
+    return table
+
 def plot_merra2_pwv(hdf_path, datafile):
     import matplotlib.cm as cm
     from mpl_toolkits.basemap import Basemap
