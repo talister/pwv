@@ -4,6 +4,7 @@ from elasticsearch import Elasticsearch
 from elasticsearch_dsl import Search
 import numpy as np
 from scipy.interpolate import interp1d
+import astropy.units as u
 
 from pwv.utils import round_datetime
 
@@ -23,6 +24,10 @@ def query_LCO_telemetry(site, start, end, datum='Weather Barometric Pressure Val
 
     A list of dictionaries, containing {'UTC Datetime', <datum>} is returned, sorted into chronological order"""
 
+    unit_mapping = { 'mbar' : u.def_unit(['millibar', 'millibars'], 1.0*u.hPa),
+                     'degC' : u.deg_C
+                   }
+
     client = Elasticsearch(hosts='elasticsearch.lco.gtn', retry_on_timeout=True)
     s = Search(using=client, index='mysql-telemetry-*')
     s = s.query('match', site=site)
@@ -33,10 +38,11 @@ def query_LCO_telemetry(site, start, end, datum='Weather Barometric Pressure Val
 
     data = []
     for hit in s.scan():
+        unit = unit_mapping.get(hit.units, 1.0)
         result = {  'UTC Datetime' : datetime.strptime(hit.timestampmeasured, "%Y-%m-%dT%H:%M:%S.%fZ"),
-                    datum : hit.value_float}
+                    datum : hit.value_float * unit}
         data.append(result)
-        if dbg: print('HIT: site={site} datumname={datumname} timestampmeasured={timestampmeasured} value={value_float}'.format(**hit.to_dict()))
+        if dbg: print('HIT: site={site} datumname={datumname} timestampmeasured={timestampmeasured} value={value_float} unit={units}'.format(**hit.to_dict()))
 
     sorted_data = sorted(data, key=lambda k:  k['UTC Datetime'])
 
