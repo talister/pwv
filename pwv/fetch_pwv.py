@@ -44,8 +44,8 @@ def convert_decimal_day(decimal_day, year=datetime.utcnow().year):
         dt= dt.replace(microsecond = 0)
     return dt
 
-def fetch_pwv(site, year=datetime.utcnow().year):
-    """Download the SuomiNet precipitable water vapor for the specified <site>
+def fetch_GPS_pwv(site, year=datetime.utcnow().year):
+    """Download the SuomiNet GPS-based precipitable water vapor for the specified <site>
     and the particular [year] (defaults to current one if not specified).
     Returns an AstroPy Q(uantity)Table with columns:
         DayOfYear: decimal day of the year
