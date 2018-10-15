@@ -718,6 +718,7 @@ def fetch_LCO_weather(site_code, start=None, end=None, interval=600, dbg=False):
         datum = map_quantity_to_LCO_datum(quantity)
         data = query_LCO_telemetry(site_code, start, end, datum)
         interp_timestamps, interp_values = interpolate_LCO_telemetry(data, interval)
+        unit = interp_values[0].unit
         if dbg: print(quantity, interp_timestamps[0], interp_timestamps[-1], len(interp_timestamps), len(interp_values))
 
         # Check if the interpolated dataset starts late or ends early and pad
@@ -725,6 +726,8 @@ def fetch_LCO_weather(site_code, start=None, end=None, interval=600, dbg=False):
         num_before = max(int((interp_timestamps[0]-start) / timedelta(seconds=interval)), 0)
         num_after  = max(int((end-interp_timestamps[-1]) / timedelta(seconds=interval)), 0)
         pad_values = np.pad(interp_values, (num_before, num_after), 'edge')
+        # Put units back
+        pad_values = pad_values * unit
         if dbg: print("Padding by {} before, {} after, new length={}".format(num_before, num_after, len(pad_values)))
         # Trim padded array to right length, turn into a column and add to table
         col = Column(pad_values[0:nrows], name=quantity)

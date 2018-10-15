@@ -59,7 +59,11 @@ def interpolate_LCO_telemetry(data, interval=300, kind='linear'):
     times = [i['UTC Datetime'] for i in data]
     timestamps = [t.timestamp() for t in times]
     quantity = [key for key in data[0].keys() if key != 'UTC Datetime'][0]
-    values = [x[quantity] for x in data]
+    values = [x[quantity].value for x in data]
+    try:
+        unit = data[0][quantity].unit
+    except AttributeError:
+        unit = 1.0
 
     # Determine start and end times (rounded to the interval) and number of steps
     start = round_datetime(times[0], interval/60.0, round_up=True)
@@ -76,4 +80,4 @@ def interpolate_LCO_telemetry(data, interval=300, kind='linear'):
     interp_func = interp1d(timestamps, values, kind)
     interp_values = interp_func(interp_timestamps)
 
-    return interp_times, interp_values
+    return interp_times, interp_values*unit
