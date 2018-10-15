@@ -29,20 +29,9 @@ from pydap.cas.urs import setup_session
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.ticker import MaxNLocator, AutoMinorLocator
-from pwv.utils import determine_time_index, time_index_to_dt, make_bounding_box, compute_pwv
+from pwv.utils import convert_decimal_day, determine_time_index, time_index_to_dt, make_bounding_box, compute_pwv
 from pwv.telemetry import map_quantity_to_LCO_datum, query_LCO_telemetry, interpolate_LCO_telemetry
 
-def convert_decimal_day(decimal_day, year=datetime.utcnow().year):
-
-    if type(year) == datetime:
-        year = year.year
-    dt = datetime(year-1, 12, 31, 0, 0, 0, 0) + timedelta(decimal_day)
-    if dt.microsecond >= 500000:
-        dt += timedelta(seconds=1)
-        dt = dt.replace(microsecond = 0)
-    else:
-        dt= dt.replace(microsecond = 0)
-    return dt
 
 def fetch_GPS_pwv(site, year=datetime.utcnow().year):
     """Download the SuomiNet GPS-based precipitable water vapor for the specified <site>

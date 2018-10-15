@@ -5,44 +5,6 @@ import astropy.units as u
 
 from pwv.fetch_pwv import *
 
-class TestConvertDecimalDay(object):
-
-    def test_Jan1(self):
-        expected_dt = datetime(datetime.utcnow().year, 1, 1, 4, 15, 0)
-
-        decimal_day = 1.17708
-
-        dt = convert_decimal_day(decimal_day)
-
-        assert expected_dt == dt
-
-    def test_Jun12(self):
-        expected_dt = datetime(datetime.utcnow().year, 6, 12, 18, 45, 0)
-
-        decimal_day = 163.78125
-
-        dt = convert_decimal_day(decimal_day)
-
-        assert expected_dt == dt
-
-    def test_2016Jun11(self):
-        # 2016 is a leap year so this is 1 day earlier
-        expected_dt = datetime(2016, 6, 11, 18, 45, 0)
-
-        decimal_day = 163.78125
-
-        dt = convert_decimal_day(decimal_day, 2016)
-
-        assert expected_dt == dt
-
-    def test_2016Jun11_dt(self):
-        expected_dt = datetime(2016, 6, 11, 18, 45, 0)
-
-        decimal_day = 163.78125
-
-        dt = convert_decimal_day(decimal_day, year=datetime(2016,1,1))
-
-        assert expected_dt == dt
 
 class TestDetermineIndex(object):
     def setup_method(self):

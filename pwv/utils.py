@@ -62,6 +62,18 @@ def compute_pwv(ztd, location, pres, T_2m):
 
     return pwv
 
+def convert_decimal_day(decimal_day, year=datetime.utcnow().year):
+
+    if type(year) == datetime:
+        year = year.year
+    dt = datetime(year-1, 12, 31, 0, 0, 0, 0) + timedelta(decimal_day)
+    if dt.microsecond >= 500000:
+        dt += timedelta(seconds=1)
+        dt = dt.replace(microsecond = 0)
+    else:
+        dt= dt.replace(microsecond = 0)
+    return dt
+
 def determine_time_index(date_or_str, t0='00:30Z01Jan1980'):
 
     if type(t0) != datetime:
