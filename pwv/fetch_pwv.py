@@ -29,7 +29,7 @@ from pydap.cas.urs import setup_session
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.ticker import MaxNLocator, AutoMinorLocator
-from pwv.utils import determine_time_index, time_index_to_dt, make_bounding_box
+from pwv.utils import determine_time_index, time_index_to_dt, make_bounding_box, compute_pwv
 from pwv.telemetry import map_quantity_to_LCO_datum, query_LCO_telemetry, interpolate_LCO_telemetry
 
 def convert_decimal_day(decimal_day, year=datetime.utcnow().year):
@@ -104,6 +104,7 @@ def map_LCO_to_location(site_code):
 
     mapping = { 'LSC' : EarthLocation(lon=-70.806885, lat= -30.169165, height= 2218.45),
                 'FTN' : EarthLocation(lon=-156.257029, lat=20.706657, height=3046.52),
+                'OGG' : EarthLocation(lon=-156.257029, lat=20.706657, height=3046.52),
                 'FTS' : EarthLocation(lon=149.070277778, lat=-31.2731666667, height=1111.8),
                 'ELP' : EarthLocation(lon=-104.02199,  lat=30.68049, height=2057.185),
                 'CPT' : EarthLocation(lon=20.8101083333, lat=-32.3806083333, height=1807),
@@ -733,6 +734,20 @@ def fetch_LCO_weather(site_code, start=None, end=None, interval=600, dbg=False):
         col = Column(pad_values[0:nrows], name=quantity)
         table.add_column(col)
     return table
+
+def populate_PWV_column(location, combined_table, dbg=False):
+    """Repopulates the PWV column of the passed <combined_table> by calculating
+    the PWV from the TotalZenithDelay, temperature and pressure. The value is not
+    updated if already positive (>0) as -9.9 is normally used to indicate missing
+    data. The PWVerr column is set to -9.9 mm"""
+
+    for i, row in enumerate(combined_table):
+        if row['PWV'] < 0.0:
+            pwv = compute_pwv(row['TotalZenithDelay'], location, row['pressure'], row['temperature'])
+            if dbg: print(row['TotalZenithDelay'], row['pressure'], row['temperature'], pwv)
+            combined_table[i]['PWV'] = pwv
+            combined_table[i]['PWVerr'] = -9.9 * u.mm
+    return combined_table
 
 def plot_merra2_pwv(hdf_path, datafile):
     import matplotlib.cm as cm
