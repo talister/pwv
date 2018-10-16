@@ -18,7 +18,7 @@ from netrc import netrc
 import xml.etree.ElementTree as etree
 from subprocess import check_output
 
-from astropy.table import QTable, Column
+from astropy.table import QTable, Column, join
 import astropy.units as u
 from astropy.coordinates import EarthLocation
 import numpy as np
@@ -32,6 +32,32 @@ from matplotlib.ticker import MaxNLocator, AutoMinorLocator
 from pwv.utils import convert_decimal_day, determine_time_index, time_index_to_dt, make_bounding_box, compute_pwv
 from pwv.telemetry import map_quantity_to_LCO_datum, query_LCO_telemetry, interpolate_LCO_telemetry
 
+def fetch_pwv(site_code, start=None, end=None):
+
+    table = None
+    start = start or datetime(datetime.utcnow().year, 1, 1)
+    end = end or datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+
+    GPS_site_code = map_LCO_to_GPS_sites(site_code)
+    if GPS_site_code:
+        if start.year != end.year:
+            print("Need to have start and end in the same year")
+        GPS_table = fetch_GPS_pwv(GPS_site_code, start.year)
+
+        # Check if the mean of the PWV is <0, indicating it's mostly bad values (-9.9)
+        if GPS_table['PWV'].mean() < 0.0:
+            print("PWV estimate bad, trying to repopulate")
+            weather_table = fetch_LCO_weather(site_code, start, end, 300)
+            location = map_LCO_to_location(site_code)
+            if location:
+                combined_table = join(GPS_table, weather_table)
+                table = populate_PWV_column(location, combined_table)
+            else:
+                print("Couldn't determine location for site code {}".format(site_code))
+                table = GPS_table
+        else:
+            table = GPS_table
+    return table
 
 def fetch_GPS_pwv(site, year=datetime.utcnow().year):
     """Download the SuomiNet GPS-based precipitable water vapor for the specified <site>
@@ -66,10 +92,10 @@ def fetch_GPS_pwv(site, year=datetime.utcnow().year):
         table[column].unit = units[column]
 
     # Create new datetime column
-    dt = []
-    for day in table['DayOfYear']:
+    dt = np.zeros(len(table['DayOfYear']), dtype='datetime64[s]')
+    for i, day in enumerate(table['DayOfYear']):
         new_dt = convert_decimal_day(day.value, year)
-        dt.append(new_dt)
+        dt[i] = new_dt
     aa = Column(dt, name='UTC Datetime')
     table.add_column(aa)
 
@@ -707,21 +733,24 @@ def fetch_LCO_weather(site_code, start=None, end=None, interval=600, dbg=False):
     for quantity in ['temperature', 'pressure']:
         datum = map_quantity_to_LCO_datum(quantity)
         data = query_LCO_telemetry(site_code, start, end, datum)
-        interp_timestamps, interp_values = interpolate_LCO_telemetry(data, interval)
-        unit = interp_values[0].unit
-        if dbg: print(quantity, interp_timestamps[0], interp_timestamps[-1], len(interp_timestamps), len(interp_values))
+        if len(data) > 0:
+            interp_timestamps, interp_values = interpolate_LCO_telemetry(data, interval)
+            unit = interp_values[0].unit
+            if dbg: print(quantity, interp_timestamps[0], interp_timestamps[-1], len(interp_timestamps), len(interp_values))
 
-        # Check if the interpolated dataset starts late or ends early and pad
-        # accordingly
-        num_before = max(int((interp_timestamps[0]-start) / timedelta(seconds=interval)), 0)
-        num_after  = max(int((end-interp_timestamps[-1]) / timedelta(seconds=interval)), 0)
-        pad_values = np.pad(interp_values, (num_before, num_after), 'edge')
-        # Put units back
-        pad_values = pad_values * unit
-        if dbg: print("Padding by {} before, {} after, new length={}".format(num_before, num_after, len(pad_values)))
-        # Trim padded array to right length, turn into a column and add to table
-        col = Column(pad_values[0:nrows], name=quantity)
-        table.add_column(col)
+            # Check if the interpolated dataset starts late or ends early and pad
+            # accordingly
+            num_before = max(int((interp_timestamps[0]-start) / timedelta(seconds=interval)), 0)
+            num_after  = max(int((end-interp_timestamps[-1]) / timedelta(seconds=interval)), 0)
+            pad_values = np.pad(interp_values, (num_before, num_after), 'edge')
+            # Put units back
+            pad_values = pad_values * unit
+            if dbg: print("Padding by {} before, {} after, new length={}".format(num_before, num_after, len(pad_values)))
+            # Trim padded array to right length, turn into a column and add to table
+            col = Column(pad_values[0:nrows], name=quantity)
+            table.add_column(col)
+        else:
+            print("Found no data for {} at {} between {}->{}".format(datum, site_code, start, end))
     return table
 
 def populate_PWV_column(location, combined_table, dbg=False):
