@@ -57,6 +57,8 @@ def fetch_pwv(site_code, start=None, end=None):
                 table = GPS_table
         else:
             table = GPS_table
+    else:
+        print("No site code found")
     return table
 
 def fetch_GPS_pwv(site, year=datetime.utcnow().year):
