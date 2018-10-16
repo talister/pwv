@@ -267,6 +267,7 @@ def read_ascii(filepath, dbg=False):
                             value = float(value)
                         except ValueError:
                             pass
+                        value = [value,]
                     else:
                         quantity = chunks[0]
                         value = [float(x.strip()) for x in chunks[1:]]
@@ -319,10 +320,17 @@ def read_ascii(filepath, dbg=False):
         foo_fh.close()
 
     if data.get('time', None) is not None:
-        times = time_index_to_dt(data['time'], t0)
+        times = np.array(time_index_to_dt(data['time'], t0), dtype='datetime64[s]')
         data['datetime'] = times
 
-    return data
+    table = QTable()
+    for key in data.keys():
+        print(key,len(data[key]))
+        if type(data[key]) != float and len(data[key]) > 1:
+            # Skip 1D values such as latitude or longitude
+            aa = Column(data[key], name=key)
+            table.add_column(aa)
+    return table
 
 def determine_cell(location, lats, longs):
     """Determines the latitude and longitude array indices corresponding to

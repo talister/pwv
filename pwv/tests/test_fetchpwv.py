@@ -187,7 +187,7 @@ class TestReadAscii(object):
         self.aqua_ascii = os.path.join('pwv', 'tests', 'data', 'Aqua_TotO3_D_TotH2OVap_D_test.asc')
 
     def test_merra2(self):
-        expected_keys = ['tqv', 'time', 'lat', 'datetime']
+        expected_keys = ['tqv', 'time', 'datetime']
         expected_num = 73
         expected_tqv_0 = 3.0582914
         expected_tqv_last = 8.244712
@@ -196,7 +196,7 @@ class TestReadAscii(object):
 
         data = read_ascii(self.merra2_ascii)
 
-        assert expected_keys == list(data.keys())
+        assert expected_keys == data.colnames
         for key in expected_keys:
             if key not in ['lat', 'lon']:
                 assert expected_num == len(data[key]), "Check on {} failed".format(key)
@@ -206,7 +206,7 @@ class TestReadAscii(object):
         assert expected_dt_last == data['datetime'][-1]
 
     def test_aqua(self):
-        expected_keys = ['Longitude', 'Latitude', 'TotH2OVap_D', 'TotO3_D', 'time', 'datetime']
+        expected_keys = ['TotH2OVap_D', 'TotO3_D', 'time', 'datetime']
         expected_num = 3
         expected_pwv_0 =  2.91797
         expected_pwv_last =  6.09766
@@ -217,7 +217,7 @@ class TestReadAscii(object):
 
         data = read_ascii(self.aqua_ascii)
 
-        assert expected_keys == list(data.keys())
+        assert expected_keys == data.colnames
         for key in expected_keys:
             if key not in ['Latitude', 'Longitude']:
                 assert expected_num == len(data[key]), "Check on {} failed".format(key)
