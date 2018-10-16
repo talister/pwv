@@ -325,7 +325,7 @@ def read_ascii(filepath, dbg=False):
 
     table = QTable()
     for key in data.keys():
-        print(key,len(data[key]))
+        if dbg: print(key,len(data[key]))
         if type(data[key]) != float and len(data[key]) > 1:
             # Skip 1D values such as latitude or longitude
             aa = Column(data[key], name=key)
