@@ -49,11 +49,14 @@ def fetch_pwv(site_code, start=None, end=None):
             print("PWV estimate bad, trying to repopulate")
             weather_table = fetch_LCO_weather(site_code, start, end, 300)
             location = map_LCO_to_location(site_code)
-            if location:
+            if location and 'pressure' in weather_table.colnames and 'temperature' in weather_table.colnames:
                 combined_table = join(GPS_table, weather_table)
                 table = populate_PWV_column(location, combined_table)
             else:
-                print("Couldn't determine location for site code {}".format(site_code))
+                if not location:
+                    print("Couldn't determine location for site code {}".format(site_code))
+                else:
+                    print("Couldn't find weather data for site code {}".format(site_code))
                 table = GPS_table
         else:
             table = GPS_table
@@ -729,6 +732,7 @@ def fetch_LCO_weather(site_code, start=None, end=None, interval=600, dbg=False):
     to a spacing of [interval] seconds (defaults to 600s).
     Returns an AstroPy QTable of UTC datetime and temperature and pressure"""
 
+    site_code = site_code.lower()
     start = start or datetime(datetime.utcnow().year, 1, 1)
     end = end or datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     nrows = int((end-start)/ timedelta(seconds=interval))
