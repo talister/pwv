@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, time
 import os
 from glob import glob
+from operator import itemgetter
 
 try:
     from urllib.parse import urljoin
@@ -23,6 +24,7 @@ import astropy.units as u
 from astropy.coordinates import EarthLocation
 import numpy as np
 import netCDF4 as nc
+from pyhdf.SD import SD, SDC
 from pydap.client import open_url
 from pydap.cas.urs import setup_session
 
@@ -33,7 +35,24 @@ from pwv.utils import convert_decimal_day, determine_time_index, time_index_to_d
 from pwv.telemetry import map_quantity_to_LCO_datum, query_LCO_telemetry, interpolate_LCO_telemetry
 
 def fetch_pwv(site_code, start=None, end=None):
-
+    """Download the GPS-based precipitable water vapor for the specified LCO
+    <site_code> (e.g. 'FTN', 'COJ') between the specified [start] and [end]
+    values (defaults to Jan 1 of current year and midnight on the current date
+    if not specified).
+    If the PWV is bad (mean < 0), it will attempt to repopulate it from the
+    Total Zenith Distance by obtaining the pressure and temperature from telemetry
+    and computing the Zenith Hydrostatic Delay.
+    Returns an AstroPy Q(uantity)Table with columns:
+        DayOfYear: decimal day of the year
+        PWV: precipitable water vapour (in mm; -9.9 for missing value)
+        PWVerr: error on precipitable water vapour (in mm)
+        TotalZenithDelay: total zenith delay (in mm)
+        SurfacePressure: surface pressure (in millibars)
+        SurfaceTemp: surface temperature (in degrees C)
+        SurfaceRH: surface relative humidty (%)
+        UTC Datetime: day of the year comverted to a datetime (computed, not in original)
+    Masking of bad/missing values is not done.
+    Reference: https://www.suominet.ucar.edu/data.html"""
     table = None
     start = start or datetime(datetime.utcnow().year, 1, 1)
     end = end or datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -121,6 +140,9 @@ def map_LCO_to_GPS_sites(site_code):
     return mapping.get(site_code.upper(), None)
 
 def map_LCO_to_location(site_code):
+    """Map LCO site codes/telescope names (https://lco.global/observatory/sites/) to
+    AstroPy EarthLocations.
+    Returns None if no match found."""
 
     mapping = { 'LSC' : EarthLocation(lon=-70.806885, lat= -30.169165, height= 2218.45),
                 'FTN' : EarthLocation(lon=-156.257029, lat=20.706657, height=3046.52),
@@ -134,6 +156,15 @@ def map_LCO_to_location(site_code):
     return mapping.get(site_code.upper(), None)
 
 def read_merra2(hdf_path, datafile, columns=['PS', 'T2M', 'QV2M', 'TO3', 'TQV']):
+    """Read a MERRA-2 NetCDF file <datafile> located in <hdf_path>, extracting
+    the quantities in [columns] (defaults to:
+    PS: surface pressure,
+    T2M: temperature at 2m level,
+    QV2M: specific humidity at 2m level,
+    TO3: total ozone,
+    TQV: total precipitable water vapor (converted from kg m^-2 to mm by diving by 0.997), 
+    Returns a dictionary of the columns along with the latitude (`lats`) and
+    longitude (`lons`)"""
 
     # Open file for reading, map into memory
     data = nc.Dataset(os.path.join(hdf_path,datafile), mode='r', diskless=True)
@@ -195,7 +226,8 @@ def earthdata_login(username=None, password=None):
     return opener
 
 def determine_gds_url(location, start=None, end=None, product='M2T1NXSLV', quantity='tqv'):
-    """Fetches a time series of a quantity from MERRA-2 products at a single point"""
+    """Build a GDS URL to enable fetching of a time series of a [quantity] from
+    MERRA-2 products ([product]) at a single point"""
 
     GDS_URL = 'https://goldsmr4.gesdisc.eosdis.nasa.gov/dods'
     start = start or datetime.utcnow()
@@ -363,10 +395,9 @@ def determine_cell(location, lats, longs):
             lat_idx  = (np.abs(lats-site_lat)).argmin()
         elif lats.ndim == 2 and longs.ndim == 2:
             # 2d arrays
-            X = np.abs(longs-site_long)
-            long_idx = np.where(X == X.min())
-            Y = np.abs(lats-site_lat)
-            lat_idx = np.where(Y == Y.min())
+            coordinates = np.unravel_index((np.abs(lats - site_lat) + np.abs(longs - site_long)).argmin(), lats.shape)
+            lat_idx = coordinates[0]
+            long_idx = coordinates[1]
         else:
             print("Unknown number of dimensions: %d x %d" % (lats.ndim, longs.ndim))
 
@@ -444,6 +475,13 @@ def find_modis_data(location, date=datetime.utcnow(), ndays=1, products=['MODATM
     return dl_files
 
 def download_files(files, outpath):
+    """Downloads a list of HDF files <files> (produced by `find_modis_data()`) to
+    the specified <outpath> (which is created if necessary). The file size and
+    checksum (calculated by `cksum`) is compared with the expected values in
+    the dictionary of the original file. Existing files are skipped and not
+    re-downloaded.
+    The number of files successfully downloaded is returned."""
+
     try:
         os.makedirs(outpath)
     except FileExistsError:
@@ -494,7 +532,10 @@ def dataset_mapping(product):
     return mappings.get(product, {})
 
 def read_modis_pwv(datafile, DATAFIELD_NAME = 'Water_Vapor_Infrared'):
-    from pyhdf.SD import SD, SDC
+    """Open the Aqua/Terra MODIS HDF4-EOS file <datafile> and extract the
+    data for the specified data field ([DATAFIELD_NAME]).
+    This is returned in <data> along with the latitude and longitude
+    geospatial arrays, the units and data field name"""
 
     hdf = SD(datafile, SDC.READ)
 
@@ -562,11 +603,13 @@ def split_MODIS_filename(filename):
     dt = datetime.strptime(chunks[1]+chunks[2], 'A%Y%j%H%M')
     return chunks[0], dt, str(int(chunks[3]))
 
-def extract_MODIS_pwv_timeseries(hdf_path, location):
+def extract_MODIS_pwv_timeseries(hdf_path, location, dbg=False):
+    """Loop through a series of Aqua/Terra MODIS HDF files in <hdf_path> and
+    extract the PWV at specified EatthLocation <location>"""
 
     pwv_values = []
     times = []
-    for hdf_file in glob(os.path.join(hdf_path, '*.hdf')):
+    for hdf_file in glob(os.path.join(hdf_path, 'M?D*.hdf')):
         product, date, collection = split_MODIS_filename(hdf_file)
         mapping = dataset_mapping(product)
         if len(mapping) == 0:
@@ -574,15 +617,21 @@ def extract_MODIS_pwv_timeseries(hdf_path, location):
             continue
         dataset_name = mapping.get('PWV', None)
         if dataset_name is not None:
-            data, latitude, longitude, name, units = read_modis_pwv(hdf_file, dataset_name)
+            data, latitude, longitude, units, name = read_modis_pwv(hdf_file, dataset_name)
             lat_idx, long_idx = determine_cell(location, latitude, longitude)
-            print(os.path.basename(hdf_file), lat_idx, long_idx, latitude.shape, longitude.shape, data.shape)
-            pwv_value = data[lat_idx[0], long_idx[1]]
+            if dbg: print(os.path.basename(hdf_file), lat_idx, long_idx, latitude.shape, longitude.shape, data.shape)
+            pwv_value = data[lat_idx, long_idx]
             times.append(date)
-            pwv_values.append(pwv_value[0])
-            print(pwv_value[0])
+            pwv_values.append(pwv_value)
+            if dbg: print(pwv_value)
         else:
             print("Unable to find dataset mapping for PWV in {}".format(mapping.keys()))
+    if len(times) > 0 and len(pwv_values) > 0:
+        # Sort the datetimes and PWV values by the time of the datasets
+        sorted_times, sorted_pwv_values = [list(x) for x in zip(*sorted(zip(times, pwv_values), key=itemgetter(0)))]
+        times = sorted_times
+        pwv_values = sorted_pwv_values
+
     return times, pwv_values
 
 def determine_opendap_agg_base_url(day, opendap_server, process_level, product):
@@ -598,6 +647,10 @@ def determine_opendap_agg_base_url(day, opendap_server, process_level, product):
     return url
 
 def determine_opendap_agg_url(location, start, end, server, level, product, variables):
+    """Build a OpenDAP aggregation URL to enable fetching of a time series of a
+    set of <variables> from the specified <server> for the particular
+    products ([product]) at a single point (<location>) between the
+    timespan of <start> -> <end>"""
 
     url = None
 
