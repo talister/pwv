@@ -228,7 +228,7 @@ class TestReadAscii(object):
         assert expected_dt_0 == data['datetime'][0]
         assert expected_dt_last == data['datetime'][-1]
 
-class TestReadORMPWV(object):
+class TestFetchORMPWV(object):
 
     def setup_method(self):
         self.orm_pwv_ascii = os.path.join('pwv', 'tests', 'data', 'ORM_PWV_test.dat')
@@ -243,7 +243,7 @@ class TestReadORMPWV(object):
         expected_dt_0 = datetime(2018, 10, 2, 0, 0, 0)
         expected_dt_last = datetime(2018, 10, 2, 1, 0, 0)
 
-        data = read_ORM_pwv(self.orm_pwv_ascii)
+        data = fetch_ORM_pwv(self.orm_pwv_ascii)
 
         assert expected_keys == data.colnames
 

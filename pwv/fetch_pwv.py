@@ -125,7 +125,7 @@ def fetch_GPS_pwv(site, year=datetime.utcnow().year):
 
     return table
 
-def read_ORM_pwv(url_or_datafile=None):
+def fetch_ORM_pwv(url_or_datafile=None):
     """Fetch the precipitable water vapor from the Roque de los Muchachos
     Observatory (ORM) (if <url_or_datafile> is None) or from that file if
     not None.
