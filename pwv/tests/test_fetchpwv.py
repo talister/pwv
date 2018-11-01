@@ -227,3 +227,31 @@ class TestReadAscii(object):
         assert expected_o3_last == data['TotO3_D'][-1]
         assert expected_dt_0 == data['datetime'][0]
         assert expected_dt_last == data['datetime'][-1]
+
+class TestReadORMPWV(object):
+
+    def setup_method(self):
+        self.orm_pwv_ascii = os.path.join('pwv', 'tests', 'data', 'ORM_PWV_test.dat')
+
+    def test1(self):
+        expected_keys = ['UTC Datetime', 'PWV', 'PWVerr', 'TotalZenithDelay', 'SurfacePressure', 'SurfaceTemp', 'DataSource']
+        expected_num = 3
+        expected_pwv_0 = 9.0
+        expected_pwv_last = 9.4
+        expected_tzd_0 =  1863.9
+        expected_tzd_last =  1865.5
+        expected_dt_0 = datetime(2018, 10, 2, 0, 0, 0)
+        expected_dt_last = datetime(2018, 10, 2, 1, 0, 0)
+
+        data = read_ORM_pwv(self.orm_pwv_ascii)
+
+        assert expected_keys == data.colnames
+
+        for key in expected_keys:
+            assert expected_num == len(data[key]), "Check on {} failed".format(key)
+        assert expected_pwv_0 == data['PWV'][0]
+        assert expected_pwv_last == data['PWV'][-1]
+        assert expected_tzd_0 == data['TotalZenithDelay'][0]
+        assert expected_tzd_last == data['TotalZenithDelay'][-1]
+        assert expected_dt_0 == data['UTC Datetime'][0]
+        assert expected_dt_last == data['UTC Datetime'][-1]

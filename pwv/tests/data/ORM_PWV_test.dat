@@ -1,0 +1,11 @@
+#
+Thank you for using the IAC PWV database.
+The Precipitable Water Vapour data has been provided by the Sky Quality Group of the Instituto de Astrofisica de Canarias (http://www.iac.es/site-testing).
+FINAL PRECIPITABLE WATER VAPOUR
+GPS (FINAL ORBITS)
+ROQUE DE LOS MUCHACHOS OBSERVATORY
+ANTENNA LOCATION: 2199.2m - 28N45'49.9" - 17W53'37.8"
+DATE[yyyy/mm/dd],UT[HH:MM],PWV_final[mm],ERROR[mm],TZD_final[mm],PRESS[Hpa],TEMP[C],METEO_DATA[model/sensor]
+2018/10/02,00:00,9.0,0.0,1863.9,792.0,10.5,model
+2018/10/02,00:30,9.6,0.3,1867.2,791.9,10.3,model
+2018/10/02,01:00,9.4,0.2,1865.5,791.7,10.2,model

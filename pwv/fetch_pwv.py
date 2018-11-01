@@ -50,7 +50,7 @@ def fetch_pwv(site_code, start=None, end=None):
         SurfacePressure: surface pressure (in millibars)
         SurfaceTemp: surface temperature (in degrees C)
         SurfaceRH: surface relative humidty (%)
-        UTC Datetime: day of the year comverted to a datetime (computed, not in original)
+        UTC Datetime: day of the year converted to a datetime (computed, not in original)
     Masking of bad/missing values is not done.
     Reference: https://www.suominet.ucar.edu/data.html"""
     table = None
@@ -94,7 +94,7 @@ def fetch_GPS_pwv(site, year=datetime.utcnow().year):
         SurfacePressure: surface pressure (in millibars)
         SurfaceTemp: surface temperature (in degrees C)
         SurfaceRH: surface relative humidty (%)
-        UTC Datetime: day of the year comverted to a datetime (computed, not in original)
+        UTC Datetime: day of the year converted to a datetime (computed, not in original)
     Masking of bad/missing values is not done.
     Reference: https://www.suominet.ucar.edu/data.html"""
 
@@ -122,6 +122,48 @@ def fetch_GPS_pwv(site, year=datetime.utcnow().year):
         dt[i] = new_dt
     aa = Column(dt, name='UTC Datetime')
     table.add_column(aa)
+
+    return table
+
+def read_ORM_pwv(url_or_datafile=None):
+    """Fetch the precipitable water vapor from the Roque de los Muchachos
+    Observatory (ORM) (if <url_or_datafile> is None) or from that file if
+    not None.
+    (In principle, different amounts of data can be downloaded but this doesn't
+    seem to work for num_days != 30)
+    Returns an AstroPy Q(uantity)Table with columns:
+        UTC Datetime: UTC datetime (computed from 'DATE' and 'UT' columns, not in original)
+        PWV: precipitable water vapour (in mm; -9.9 for missing value)
+        PWVerr: error on precipitable water vapour (in mm)
+        TotalZenithDelay: total zenith delay (in mm)
+        SurfacePressure: surface pressure (in hPa)
+        SurfaceTemp: surface temperature (in degrees C)
+        DataSource: Source of the meteorological data (model or sensor)
+    Masking of bad/missing values is not done.
+    Reference: https:/vivaldi.ll.iac.es/proyecto/site-testing/index.php?option=com_wrapper&Itemid=148
+    """
+
+    if url_or_datafile is not None:
+        with open(url_or_datafile, 'rb') as f:
+            data = f.read()
+    else:
+        iac_url = 'http://gaulli.ll.iac.es/data_file/download/'
+        params = { "num_days" : 30, "type" : "post" }
+        resp = requests.get(iac_url, params)
+        if resp.status_code in [200, 201]:
+            data = resp.content
+    table_lines = data.decode('latin1').split('\n')
+
+    table = QTable.read(table_lines, format="csv",header_start=7, data_start=8, delimiter=",", names=["UTC Date", "UTC Time", "PWV", "PWVerr", "TotalZenithDelay", "SurfacePressure", "SurfaceTemp", "DataSource"])
+    # Create new datetime column
+    dt = np.zeros(len(table['UTC Date']), dtype='datetime64[s]')
+    for i, day in enumerate(table['UTC Date']):
+        time = table['UTC Time'][i]
+        new_dt = datetime.strptime(day+time, "%Y/%m/%d%H:%M")
+        dt[i] = new_dt
+    aa = Column(dt, name='UTC Datetime')
+    table.add_column(aa, index=0)
+    table.remove_columns(['UTC Date', 'UTC Time'])
 
     return table
 
