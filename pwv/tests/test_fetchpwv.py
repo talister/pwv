@@ -234,19 +234,21 @@ class TestFetchORMPWV(object):
         self.orm_pwv_ascii = os.path.join('pwv', 'tests', 'data', 'ORM_PWV_test.dat')
 
     def test1(self):
+
         expected_keys = ['UTC Datetime', 'PWV', 'PWVerr', 'TotalZenithDelay', 'SurfacePressure', 'SurfaceTemp', 'DataSource']
+        expected_units = [None, u.mm, u.mm, u.mm, u.hPa, u.deg_C, None]
         expected_num = 3
-        expected_pwv_0 = 9.0
-        expected_pwv_last = 9.4
-        expected_tzd_0 =  1863.9
-        expected_tzd_last =  1865.5
+        expected_pwv_0 = 9.0*u.mm
+        expected_pwv_last = 9.4*u.mm
+        expected_tzd_0 =  1863.9*u.mm
+        expected_tzd_last =  1865.5*u.mm
         expected_dt_0 = datetime(2018, 10, 2, 0, 0, 0)
         expected_dt_last = datetime(2018, 10, 2, 1, 0, 0)
 
         data = fetch_ORM_pwv(self.orm_pwv_ascii)
 
         assert expected_keys == data.colnames
-
+        assert expected_units == [data[x].unit for x in data.colnames]
         for key in expected_keys:
             assert expected_num == len(data[key]), "Check on {} failed".format(key)
         assert expected_pwv_0 == data['PWV'][0]

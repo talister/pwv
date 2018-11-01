@@ -161,6 +161,14 @@ def fetch_ORM_pwv(url_or_datafile=None):
             data = resp.content
     table_lines = data.decode('latin1').split('\n')
 
+    units={ 'UTC Datetime' : None,
+            'PWV' : u.mm,
+            'PWVerr' : u.mm,
+            'TotalZenithDelay' : u.mm,
+            'SurfacePressure' : u.hPa,
+            'SurfaceTemp' : u.deg_C,
+            'DataSource' : None
+           }
     table = QTable.read(table_lines, format="csv",header_start=7, data_start=8, delimiter=",", names=["UTC Date", "UTC Time", "PWV", "PWVerr", "TotalZenithDelay", "SurfacePressure", "SurfaceTemp", "DataSource"])
     # Create new datetime column
     dt = np.zeros(len(table['UTC Date']), dtype='datetime64[s]')
@@ -171,6 +179,10 @@ def fetch_ORM_pwv(url_or_datafile=None):
     aa = Column(dt, name='UTC Datetime')
     table.add_column(aa, index=0)
     table.remove_columns(['UTC Date', 'UTC Time'])
+
+    # Add units
+    for column in table.columns:
+        table[column].unit = units[column]
 
     return table
 
