@@ -16,6 +16,7 @@ try:
 except ImportError:
     from http.cookiejar import CookieJar
 from netrc import netrc
+import requests
 import xml.etree.ElementTree as etree
 from subprocess import check_output
 
@@ -57,11 +58,17 @@ def fetch_pwv(site_code, start=None, end=None):
     start = start or datetime(datetime.utcnow().year, 1, 1)
     end = end or datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
-    GPS_site_code = map_LCO_to_GPS_sites(site_code)
+    GPS_site_code = map_obs_to_GPS_sites(site_code)
     if GPS_site_code:
+        print("Fetching for", GPS_site_code)
         if start.year != end.year:
             print("Need to have start and end in the same year")
-        GPS_table = fetch_GPS_pwv(GPS_site_code, start.year)
+        if GPS_site_code != 'ORM_PWV':
+            # Query SuomiNet
+            GPS_table = fetch_GPS_pwv(GPS_site_code, start.year)
+        else:
+            # Query ORM Sky Quality Group
+            GPS_table = fetch_ORM_pwv(None)
 
         # Check if the mean of the PWV is <0, indicating it's mostly bad values (-9.9)
         if GPS_table['PWV'].mean() < 0.0:
@@ -167,17 +174,21 @@ def fetch_ORM_pwv(url_or_datafile=None):
 
     return table
 
-def map_LCO_to_GPS_sites(site_code):
-    """Maps LCO site codes (e.g. 'LSC') to SuomiNet sites (e.g. 'CTIO'). None
-    is returned if the LCO site code was not found or there isn't a
+def map_obs_to_GPS_sites(site_code):
+    """Maps LCO or other site codes (e.g. 'LSC' or 'NOT') to SuomiNet sites
+    (e.g. 'CTIO') or the ORM PWV source on La Palma.
+    None is returned if the LCO site code was not found or there isn't a
     corresponding GPS site"""
 
     mapping = { 'LSC' : 'CTIO',
                 'CPT' : 'SUTM',
-                'TFN' : None,
+                'TFN' : 'ORM_PWV',
                 'COJ' : None,
                 'ELP' : 'MDO1',
-                'OGG' : 'MAUI' }
+                'OGG' : 'MAUI',
+                'NOT' : 'ORM_PWV',
+                'TNG' : 'ORM_PWV',
+                'WHT' : 'ORM_PWV' }
 
     return mapping.get(site_code.upper(), None)
 
