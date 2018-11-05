@@ -14,9 +14,12 @@ or:
 `source <path to virtualenv>/bin/activate.csh # for (t)csh-shells`
 
 then:
-
+`pip3 install numpy`
 `pip3 install -r requirements.txt`
 
+Numpy needs to be installated separately or the latter command will
+fail.
+Depending on your distribution you may also have to install development packages for libhdf4 and python.
 If you want to compute atmospheric transmissions, you will need to get and install libRadtran from http://www.libradtran.org/doku.php?id=download
 Only the basic program is needed at this time, none of the additional modules are needed.
 

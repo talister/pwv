@@ -1,4 +1,7 @@
 astropy
+scipy
+pydap
+requests
 netCDF4
 matplotlib
 pytest
