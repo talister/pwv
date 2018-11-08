@@ -14,8 +14,10 @@ or:
 `source <path to virtualenv>/bin/activate.csh # for (t)csh-shells`
 
 then:
-`pip3 install numpy`
-`pip3 install -r requirements.txt`
+```bash
+pip3 install numpy
+pip3 install -r requirements.txt
+```
 
 Numpy needs to be installated separately or the latter command will
 fail.
