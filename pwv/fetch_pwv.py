@@ -216,7 +216,8 @@ def map_LCO_to_location(site_code):
                 'ELP' : EarthLocation(lon=-104.02199,  lat=30.68049, height=2057.185),
                 'CPT' : EarthLocation(lon=20.8101083333, lat=-32.3806083333, height=1807),
                 'TFN' : EarthLocation(lon=-16.5117027778, lat=28.3003083333, height=2390.0),
-                'COJ' : EarthLocation(lon=149.070705556, lat=-31.2729791667, height=1168.0)
+                'COJ' : EarthLocation(lon=149.070705556, lat=-31.2729791667, height=1168.0),
+                'SBA' : EarthLocation(lon=-119.862856667, lat=34.4325633333, height=15.9)
               }
     return mapping.get(site_code.upper(), None)
 
