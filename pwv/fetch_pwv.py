@@ -21,6 +21,7 @@ import xml.etree.ElementTree as etree
 from subprocess import check_output
 
 from astropy.table import QTable, Column, join
+from astropy.io.ascii import InconsistentTableError
 import astropy.units as u
 from astropy.coordinates import EarthLocation
 import numpy as np
@@ -105,7 +106,7 @@ def fetch_GPS_pwv(site, year=datetime.utcnow().year):
     Masking of bad/missing values is not done.
     Reference: https://www.suominet.ucar.edu/data.html"""
 
-    url = "https://www.cosmic.ucar.edu/suominet/data/staYrDayGlob/"
+    url = "https://www.suominet.ucar.edu/data/staYrDayGlob/"
 
     gps_file = "{}_{:4d}global.plt".format(site, year)
     dl_link = urljoin(url, gps_file)
@@ -118,9 +119,22 @@ def fetch_GPS_pwv(site, year=datetime.utcnow().year):
             'SurfaceTemp' : u.deg_C,
             'SurfaceRH' : u.percent
            }
-    table = QTable.read(dl_link, format='ascii', names=["DayOfYear", "PWV", "PWVerr", "TotalZenithDelay", "SurfacePressure", "SurfaceTemp", "SurfaceRH"])
+
+    try:
+        table = QTable.read(dl_link, format='ascii', names=["DayOfYear", "PWV", "PWVerr", "TotalZenithDelay", "SurfacePressure", "SurfaceTemp", "SurfaceRH"])
+    except InconsistentTableError:
+        table = QTable.read(dl_link, format='ascii', names=["DayOfYear", "PWV", "PWVerr", "TotalZenithDelay", "SurfacePressure", "SurfaceTemp", "SurfaceRH", "Unknown1", "Unknown2", "Unknown3"])
+    except ur.HTTPError:
+        # CONUS not global site
+        url = "https://www.suominet.ucar.edu/data/staYrDay/"
+        gps_file = "{}pp_{:4d}.plt".format(site, year)
+        dl_link = urljoin(url, gps_file)
+        table = QTable.read(dl_link, format='ascii', names=["DayOfYear", "PWV", "PWVerr", "TotalZenithDelay", "SurfacePressure", "SurfaceTemp", "SurfaceRH", "Unknown1", "Unknown2", "Unknown3"])
     for column in table.columns:
-        table[column].unit = units[column]
+        if "Unknown" in column:
+            table.remove_column(column)
+        else:
+            table[column].unit = units[column]
 
     # Create new datetime column
     dt = np.zeros(len(table['DayOfYear']), dtype='datetime64[s]')
