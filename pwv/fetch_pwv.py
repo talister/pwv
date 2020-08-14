@@ -130,7 +130,8 @@ def fetch_GPS_pwv(site, year=datetime.utcnow().year):
         gps_file = "{}pp_{:4d}.plt".format(site, year)
         dl_link = urljoin(url, gps_file)
         table = QTable.read(dl_link, format='ascii', names=["DayOfYear", "PWV", "PWVerr", "TotalZenithDelay", "SurfacePressure", "SurfaceTemp", "SurfaceRH", "Unknown1", "Unknown2", "Unknown3"])
-    for column in table.columns:
+    table_columns = table.columns.copy()
+    for column in table_columns:
         if "Unknown" in column:
             table.remove_column(column)
         else:
@@ -242,7 +243,7 @@ def read_merra2(hdf_path, datafile, columns=['PS', 'T2M', 'QV2M', 'TO3', 'TQV'])
     T2M: temperature at 2m level,
     QV2M: specific humidity at 2m level,
     TO3: total ozone,
-    TQV: total precipitable water vapor (converted from kg m^-2 to mm by diving by 0.997), 
+    TQV: total precipitable water vapor (converted from kg m^-2 to mm by diving by 0.997),
     Returns a dictionary of the columns along with the latitude (`lats`) and
     longitude (`lons`)"""
 
